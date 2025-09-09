@@ -1,0 +1,1 @@
+{"method": "port.config.set", "params": ["{PORT_ID}", {"Shutdown": false}], "id": 1}

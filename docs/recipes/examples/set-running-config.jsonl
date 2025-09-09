@@ -1,0 +1,2 @@
+{ "method": "icfg.control.copy.set", "params": [{ "Copy": true, "DestinationConfigType": "runningConfig", "DestinationConfigFile": "", "SourceConfigType": "configFile", "SourceConfigFile": "tftp://{TFTP_SERVER_IP}/running-config", "Merge": false }], "id": 1 }
+{ "method": "icfg.status.copy.get", "params": [], "id": 99 }

@@ -1,0 +1,1 @@
+{"method":"systemUtility.control.reboot.set","params":[1,{"Type":"coldReboot"}],"id":1}

@@ -1,0 +1,1 @@
+{"method":"icfg.control.copy.set","params":[ { "Copy": true, "SourceConfigType": "runningConfig", "SourceConfigFile": "", "DestinationConfigType": "startupConfig", "DestinationConfigFile": "", "Merge": false } ],"id":1}

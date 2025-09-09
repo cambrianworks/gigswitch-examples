@@ -1,0 +1,1 @@
+{"method": "https.config.global.set", "params": [{"Mode": true, "RedirectToHttps": true}], "id": 1}

@@ -1,0 +1,1 @@
+{ "method": "https.config.certUpload.set", "params": [{ "Url": "tftp://{SERVER_IP}/server.pem", "Pass_phrase": "" }], "id": 1 }
