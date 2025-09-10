@@ -19,7 +19,7 @@ git clone https://github.com/cambrianworks/gigswitch-examples.git
 
 Documentation for configuration, recipes and quick tips are all in the `docs/` subdirectory:
 
-- [Docs README](./docs/README.md): Starting point for navigating the documentation.
+- [docs/README](./docs/README.md): Starting point for navigating the documentation.
 
 ## License
 
