@@ -5,9 +5,9 @@ This repository is a public-facing collection of examples and tools for the **Gi
 ## Getting Started
 
 This repository is best used on a Linux machine with network access to a GigSwitch device and common tools installed such as `Python 3`, `curl`, `jq` and `ssh`. However, any machine with firewall access can connect to the GigSwitch using:
-* http(s)://HOSTNAME - general web interface
-* ssh admin@HOSTNAME - ICLI (command line) or shell interface
-* http(s)://HOSTNAME/json_rpc - JSON RPC interface
+* http(s)://{GS_IP} - general web interface
+* ssh admin@{GS_IP} - ICLI (command line) or shell interface
+* http(s)://{GS_IP}/json_rpc - JSON RPC interface
 
 To clone this repository to your local machine:
 
