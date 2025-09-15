@@ -8,9 +8,8 @@ Welcome to the GigSwitch user documentation repository. This master guide will h
 
 1. [Introduction & Scope](#introduction--scope)
 2. [Prerequisites](#prerequisites)
-3. [Repository Layout](#repository-layout)
-4. [Navigation Tips](#navigation-tips)
-5. [Available Guides](#available-guides)
+3. [Navigation Tips](#navigation-tips)
+4. [Available Guides](#available-guides)
 
 ---
 
@@ -34,34 +33,6 @@ This document is designed for end users working with the GigSwitch.
 - `gs-rpc` installed and bootstrapped (see `helper-tool.md`)
 - Standard Debian/Ubuntu Linux machine recommended with `apt` installed packages
   - `sudo apt install curl jq python3 python3-requests python3-yaml`
-
----
-
-## Repository Layout
-
-```plaintext
-docs/
-├── README.md                   # This master guide
-├── switch-basics.md            # Hardware, filesystem & capabilities
-├── standard-tools.md           # Overview of Web UI, CLI, vson & curl
-├── helper-tool-gs-rpc.md       # gs-rpc: install & usage
-└── recipes/
-    ├── filesystem-capabilities.md   # Filesystem & capabilities
-    ├── persist-changes.md           # Persist current changes
-    ├── compare-configs.md           # View changes vs defaults
-    ├── reset-factory.md             # Reset to factory defaults
-    ├── reset-saved-state.md         # Reset to saved state
-    ├── reboot.md                    # Reboot commands
-    ├── save-config.md               # Save config commands
-    ├── network-setup.md             # DNS/NTP/DHCP setup
-    ├── logging.md                   # Enable & review logging
-    ├── ports-list.md                # List ports & capabilities
-    ├── vlan-setup.md                # VLAN configuration
-    ├── snmp-setup.md                # SNMP configuration
-    ├── ptp-setup.md                 # PTP configuration
-    ├── broadcast-storm.md           # Broadcast storm control
-    └── TBD.md                       # Other example recipes
-```
 
 ---
 
