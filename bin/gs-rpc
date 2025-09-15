@@ -1,0 +1,841 @@
+#!/usr/bin/env python3
+"""
+Gigswitch CLI: wrapper for JSON-RPC calls to a Gigabit switch API.
+Supports subcommands with shared options and a user config file (~/.gigswitch/config.yaml).
+
+Input formats for `post`:
+  • Single JSON object
+  • JSON Lines (one JSON object per line)
+  • Concatenated JSON objects (nonstandard but allows formatting)
+  • JSON array of objects: [ {..}, {..}, ... ]
+"""
+import argparse
+import os
+import re
+import sys
+import yaml
+import json
+import requests
+from typing import Any, List
+
+# Default config and spec cache paths
+default_config_path = os.path.expanduser("~/.gigswitch/config.yaml")
+default_spec_cache = os.path.expanduser("~/.gigswitch/json_spec.json")
+default_json_url = "http://microchip:80/json_rpc"
+default_username = "admin"
+default_password = ""
+default_snapshot_cmd = "gs-grab-running-config-wrapper {host}"
+
+def load_config(path):
+    if os.path.exists(path):
+        with open(path) as f:
+            return yaml.safe_load(f) or {}
+    return {}
+
+def save_config(path, data):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        yaml.safe_dump(data, f)
+
+def _load_json_token(token: str) -> Any:
+    """
+    Load one CLI token as JSON if possible, else auto-coerce to string.
+
+    Supports:
+      - JSON literals: numbers, booleans, null, arrays, objects, quoted strings
+      - @file.json -> load JSON from file
+      - "-"        -> read JSON from stdin
+      - Fallback: if not valid JSON, return the token as a raw string.
+    """
+    # Allow reading full stdin as JSON
+    if token == "-":
+        try:
+            return json.load(sys.stdin)
+        except Exception as e:
+            raise SystemExit(f"❌ Failed to parse JSON from stdin: {e}")
+
+    # Allow loading from @file.json
+    if token.startswith("@"):
+        path = token[1:]
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            raise SystemExit(f"❌ Failed to parse JSON from file {path}: {e}")
+
+    # Try JSON first
+    try:
+        return json.loads(token)
+    except json.JSONDecodeError:
+        # Fallback: treat as raw string (since command-line arguments unwrap quotes and '"some arg"' and '"foo"' are awkward)
+        return token
+
+def _build_params(tokens: List[str]) -> list:
+    """
+    vson-compatible params builder:
+      - 0 args   -> []
+      - 1 arg    -> load JSON; if not an array, wrap into [value]
+      - >1 args  -> load each as JSON; params = [v1, v2, ...]
+    """
+    if not tokens:
+        return []
+    if len(tokens) == 1:
+        val = _load_json_token(tokens[0])
+        return val if isinstance(val, list) else [val]
+    return [_load_json_token(t) for t in tokens]
+
+# === JSONC/Vars Helpers (self-contained, no external deps) =====================
+def _strip_bom(s: str) -> str:
+    return s[1:] if s.startswith("\ufeff") else s
+
+def _strip_comments(src: str) -> str:
+    out = []
+    i, n = 0, len(src)
+    in_str = False
+    str_q = ""
+    esc = False
+    in_line = False
+    in_block = False
+    while i < n:
+        c = src[i]
+        nxt = src[i + 1] if i + 1 < n else ""
+        if in_line:
+            if c == "\n":
+                in_line = False
+                out.append(c)
+        elif in_block:
+            if c == "*" and nxt == "/":
+                in_block = False
+                i += 1
+        elif in_str:
+            out.append(c)
+            if esc:
+                esc = False
+            elif c == "\\":
+                esc = True
+            elif c == str_q:
+                in_str = False
+        else:
+            if c == "/" and nxt == "/":
+                in_line = True
+                i += 1
+            elif c == "/" and nxt == "*":
+                in_block = True
+                i += 1
+            elif c in ("'", '"'):
+                in_str = True
+                str_q = c
+                out.append(c)
+            else:
+                out.append(c)
+        i += 1
+    return "".join(out)
+
+def _remove_trailing_commas(src: str) -> str:
+    out = []
+    in_str = False
+    esc = False
+    for c in src:
+        if in_str:
+            out.append(c)
+            if esc:
+                esc = False
+            elif c == "\\":
+                esc = True
+            elif c == in_str:
+                in_str = False
+            continue
+        if c in ('"', "'"):
+            in_str = c
+            out.append(c)
+            continue
+        if c in "]}":
+            j = len(out) - 1
+            while j >= 0 and out[j].isspace():
+                j -= 1
+            if j >= 0 and out[j] == ",":
+                out.pop(j)
+            out.append(c)
+            continue
+        out.append(c)
+    return "".join(out)
+
+import re as _re
+_VAR_TOKEN = _re.compile(r"\$\{([^}]+)\}")
+
+def _expand_vars(text: str, vars_map: dict, allow_env: bool, allow_undef: bool) -> str:
+    def repl(m):
+        key = m.group(1)
+        if key.startswith("env:"):
+            if not allow_env:
+                raise ValueError(f"env expansion disabled: ${{{key}}}")
+            name = key[4:]
+            val = os.getenv(name)
+            if val is None and not allow_undef:
+                raise KeyError(f"missing env var {name}")
+            return "" if val is None else str(val)
+        if key in vars_map:
+            return str(vars_map[key])
+        if allow_undef:
+            return m.group(0)
+        raise KeyError(f"missing var {key}")
+
+    return _VAR_TOKEN.sub(repl, text)
+
+def _try_jsonl_lines(clean: str):
+    vals = []
+    any_nonempty = False
+    for ln in clean.splitlines():
+        s = ln.strip()
+        if not s:
+            continue
+        any_nonempty = True
+        try:
+            vals.append(json.loads(s))
+        except json.JSONDecodeError:
+            return None
+    return vals if any_nonempty else []
+
+def _tokenize_concatenated(clean: str):
+    vals, buf = [], []
+    depth = 0
+    in_str = False
+    esc = False
+    for c in clean:
+    # Note: Keep alignment: no logic changes beyond placeholders support.
+        if in_str:
+            buf.append(c)
+            if esc:
+                esc = False
+            elif c == "\\":
+                esc = True
+            elif c == in_str:
+                in_str = False
+            continue
+        if c in ('"', "'"):
+            in_str = c
+            buf.append(c)
+            continue
+        if c in "{[":
+            depth += 1
+            buf.append(c)
+            continue
+        if c in "}]":
+            depth -= 1
+            buf.append(c)
+            if depth == 0:
+                vals.append("".join(buf).strip())
+                buf.clear()
+            continue
+        if depth == 0 and c.isspace():
+            continue
+        buf.append(c)
+    return vals
+
+def _validate_object_list(vals, origin="input"):
+    out = []
+    for idx, v in enumerate(vals, 1):
+        if not isinstance(v, dict):
+            raise TypeError(
+                f"{origin}: item {idx} is not an object (got {type(v).__name__})"
+            )
+        out.append(v)
+    return out
+
+def _parse_vars_file(path: str) -> dict:
+    # Detect by extension; fall back to YAML
+    ext = os.path.splitext(path)[1].lower()
+    with open(path, "r", encoding="utf-8") as f:
+        data = f.read()
+    if ext in (".json",):
+        obj = json.loads(data or "{}")
+        if not isinstance(obj, dict):
+            raise TypeError(f"{path}: expected object at top-level")
+        return obj
+    if ext in (".env", ".dotenv", ".sh"):
+        m = {}
+        for i, ln in enumerate(data.splitlines(), 1):
+            s = ln.strip()
+            if not s or s.startswith("#"):
+                continue
+            # KEY=VALUE or key="value"
+            if "=" not in s:
+                raise ValueError(f"{path}:{i}: expected KEY=VALUE")
+            k, v = s.split("=", 1)
+            k = k.strip()
+            v = v.strip()
+            if len(v) >= 2 and v[0] == v[-1] and v[0] in ('"', "'"):
+                v = v[1:-1]
+            m[k] = v
+        return m
+    # default: YAML (also handles .yml)
+    obj = yaml.safe_load(data or "") or {}
+    if not isinstance(obj, dict):
+        raise TypeError(f"{path}: expected mapping at top-level")
+    return obj
+
+def _merge_vars(files: list | None, defines: list | None) -> dict:
+    vars_map = {}
+    for p in files or []:
+        vars_map.update(_parse_vars_file(p))
+    for d in defines or []:
+        if "=" not in d:
+            raise ValueError(f"-D expects key=value, got: {d}")
+        k, v = d.split("=", 1)
+        vars_map[k] = v
+    return vars_map
+
+def parse_payloads(
+    raw_text: str,
+    *,
+    jsonc: bool,
+    relaxed: bool,
+    vars_map: dict | None,
+    allow_env: bool,
+    allow_undef: bool,
+    origin="input",
+):
+    text = _strip_bom(raw_text)
+    if jsonc:
+        text = _strip_comments(text)
+        if relaxed:
+            text = _remove_trailing_commas(text)
+        if vars_map:
+            text = _expand_vars(text, vars_map, allow_env, allow_undef)
+
+    # JSONL first
+    vals = _try_jsonl_lines(text)
+    if vals is not None:
+        return _validate_object_list(vals, origin)
+
+    # Whole doc as JSON (object or array)
+    try:
+        doc = json.loads(text)
+        if isinstance(doc, list):
+            return _validate_object_list(doc, origin)
+        return _validate_object_list([doc], origin)
+    except json.JSONDecodeError:
+        pass
+
+    # Concatenated objects
+    chunks = _tokenize_concatenated(text)
+    if chunks:
+        objs = [json.loads(c) for c in chunks]
+        return _validate_object_list(objs, origin)
+
+    raise ValueError(
+        f"{origin}: not valid JSON/JSONL; check for unquoted keys/single quotes"
+    )
+
+# --- Emit JSONL with optional ID injection -----------------------------------
+def _emit_jsonl(entries, path, *, resequence=False, add_missing=False, id_start=1):
+    counter = id_start
+    out = []
+    for obj in entries:
+        o = dict(obj)  # shallow copy
+        if resequence:
+            o["id"] = counter
+            counter += 1
+        elif add_missing and "id" not in o:
+            o["id"] = counter
+            counter += 1
+        out.append(o)
+    with open(path, "w", encoding="utf-8") as f:
+        for o in out:
+            # IMPORTANT: do NOT add 'jsonrpc': '2.0'
+            f.write(json.dumps(o, separators=(",", ":")) + "\n")
+    return out
+
+# --- Optional snapshot support (shell-based; configurable) --------------------
+import subprocess, difflib
+from urllib.parse import urlparse as _urlparse
+
+def _format_snapshot_cmd(cmd_tpl: str, config: dict) -> str:
+    url = config.get("json_url", "") or ""
+    u = _urlparse(url) if url else None
+    host = u.hostname if u and u.hostname else ""
+    user = config.get("username", "") or ""
+    pw   = config.get("password", "") or ""
+    # Allow placeholders in the template
+    try:
+        return cmd_tpl.format(host=host, user=user, password=pw, json_url=url)
+    except Exception:
+        # If formatting fails, just return the template as-is
+        return cmd_tpl
+
+def _run_snapshot_shell(cmd: str) -> str:
+    try:
+        out = subprocess.check_output(
+            cmd, shell=True, stderr=subprocess.STDOUT, text=True, timeout=90
+        )
+        return out
+    except Exception as e:
+        return f"<snapshot error: {e}>"
+
+def _snapshot(config: dict, label: str, base: str) -> str | None:
+    cmd_tpl = config.get("snapshot_cmd")
+    if not cmd_tpl:
+        # Silent skip if not configured
+        return None
+    cmd = _format_snapshot_cmd(cmd_tpl, config)
+    data = _run_snapshot_shell(cmd)
+    path = f"{base}.{label}.txt"
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(data)
+    return data
+
+def _snapshot_diff(before: str | None, after: str | None, base: str):
+    if before is None or after is None:
+        return
+    diff = difflib.unified_diff(
+        before.splitlines(True),
+        after.splitlines(True),
+        fromfile="before",
+        tofile="after",
+    )
+    with open(f"{base}.diff.txt", "w", encoding="utf-8") as f:
+        f.writelines(diff)
+
+# ==============================================================================
+
+def safe_parse_json(text):
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError as e:
+        print(f"❌ Failed to parse JSON: {e}")
+        print("Raw response:", text)
+        sys.exit(1)
+
+def cmd_bootstrap(args):
+    """Generate or edit config values and fetch spec"""
+    cfg_path = args.config
+    cfg_exists = os.path.exists(cfg_path)
+    if cfg_exists:
+        choice = (
+            input(
+                f"Config already exists. [O]verwrite with defaults, [E]dit existing, or [A]bort? (O/E/A): "
+            )
+            .strip()
+            .lower()
+        )
+        if choice == "a":
+            print("Aborting.")
+            return
+        elif choice == "o":
+            cfg = {}
+        else:
+            cfg = load_config(cfg_path)
+    else:
+        cfg = {}
+
+    prompts = [
+        ("json_url", default_json_url),
+        ("json_spec_cache", default_spec_cache),
+        ("username", default_username),
+        ("password", default_password),
+        ("snapshot_cmd", default_snapshot_cmd),
+    ]
+    for key, default_val in prompts:
+        current = cfg.get(key, default_val)
+        val = input(f"Enter value for {key} [{current}]: ") or current
+        cfg[key] = val
+
+    save_config(cfg_path, cfg)
+    print(f"Config written to {cfg_path}")
+    print("Fetching JSON-RPC spec inventory...")
+    cmd_update_spec(args, cfg)
+
+def cmd_update_spec(args, config):
+    """Fetch JSON-RPC spec inventory and cache to file"""
+    payload = {
+        "method": "jsonRpc.status.introspection.specific.inventory.get",
+        "params": [""],
+        "id": 1,
+    }
+    resp = requests.post(
+        config["json_url"],
+        json=payload,
+        auth=(config.get("username", ""), config.get("password", "")),
+    )
+    resp.raise_for_status()
+    raw = resp.text
+    data = safe_parse_json(raw)
+    if "result" not in data:
+        print(f"❌ Response missing 'result': {data}")
+        sys.exit(1)
+    os.makedirs(os.path.dirname(config["json_spec_cache"]), exist_ok=True)
+    with open(config["json_spec_cache"], "w") as f:
+        json.dump(data["result"], f, indent=2)
+    print(f"Spec cached to {config['json_spec_cache']}")
+
+def perform_request(entry, config, raw_flag, id_counter):
+    entry.setdefault("params", [])
+    if "id" not in entry:
+        entry["id"] = id_counter[0]
+        id_counter[0] += 1
+    if raw_flag:
+        print("Request:", json.dumps(entry))
+    resp = requests.post(
+        config["json_url"],
+        json=entry,
+        auth=(config.get("username", ""), config.get("password", "")),
+    )
+    resp.raise_for_status()
+    raw = resp.text
+    try:
+        result = json.loads(raw)
+    except json.JSONDecodeError:
+        print("❌ Invalid JSON response:", raw)
+        sys.exit(1)
+    if raw_flag:
+        print("Response:", json.dumps(result))
+        return result
+    if "result" in result and result.get("error") is None:
+        print(json.dumps(result["result"], indent=2))
+    else:
+        print(json.dumps(result, indent=2))
+        if result.get("error") is not None:
+            raise RuntimeError("RPC error")
+    return result
+
+def cmd_call(args, config):
+    """Call a JSON-RPC method with positional args"""
+    params = _build_params(args.params or [])
+    entry = {"jsonrpc": "2.0", "method": args.method, "params": params, "id": 1}
+    perform_request(entry, config, args.raw, [2])
+
+def cmd_post(args, config):
+    """Post JSON payload(s)"""
+    if args.data:
+        raw = args.data
+        origin = "<inline>"
+    elif args.file:
+        with open(args.file) as f:
+            raw = f.read()
+        origin = args.file
+    else:
+        if sys.stdin.isatty():
+            print(
+                "Hit CTRL-D to end input (or CTRL-Z then Enter on Windows)",
+                file=sys.stderr,
+            )
+        raw = sys.stdin.read()
+        origin = "<stdin>"
+
+    # JSONC/vars-aware path (relaxed if .jsonc or --jsonc)
+    is_jsonc = bool(args.jsonc or (args.file and args.file.endswith(".jsonc")))
+    if is_jsonc:
+        try:
+            vars_map = _merge_vars(args.vars, args.define)
+            entries = parse_payloads(
+                raw_text=raw,
+                jsonc=True,
+                relaxed=not args.strict_json,
+                vars_map=vars_map,
+                allow_env=args.allow_env,
+                allow_undef=args.allow_undefined,
+                origin=origin,
+            )
+        except Exception as e:
+            print(f"❌ JSONC processing error: {e}")
+            sys.exit(1)
+    else:
+        # ORIGINAL strict parsing path
+        raw_stripped = raw.strip()
+        entries = []
+        if raw_stripped.startswith("["):
+            parsed = safe_parse_json(raw_stripped)
+            if not isinstance(parsed, list):
+                print("❌ Expected a JSON array at top level for list input.")
+                sys.exit(1)
+            for idx, item in enumerate(parsed, 1):
+                if not isinstance(item, dict):
+                    print(
+                        f"❌ Element {idx} in array is not an object: {type(item).__name__}"
+                    )
+                    sys.exit(1)
+            entries.extend(parsed)
+        elif "\n" in raw_stripped:
+            lines = raw_stripped.splitlines()
+            nonempty = [ln for ln in lines if ln.strip()]
+            if nonempty and all(ln.lstrip().startswith("{") for ln in nonempty):
+                for line in nonempty:
+                    entries.append(safe_parse_json(line))
+            else:
+                entries.append(safe_parse_json(raw_stripped))
+        else:
+            parsed = safe_parse_json(raw_stripped)
+            if not isinstance(parsed, dict):
+                print(
+                    "❌ Top-level JSON must be an object, array of objects, or JSON Lines of objects."
+                )
+                sys.exit(1)
+            entries.append(parsed)
+
+    # Optional: write normalized JSONL (with IDs) and optionally exit
+    if args.emit_jsonl:
+        reseq = bool(args.emit_reseq)
+        addid = bool(args.emit_add_id)
+        start = int(args.emit_id_start or 1)
+        _emit_jsonl(
+            entries,
+            args.emit_jsonl,
+            resequence=reseq,
+            add_missing=addid,
+            id_start=start,
+        )
+        print(f"Wrote normalized JSONL to {args.emit_jsonl}")
+        if args.emit_only:
+            return
+
+    # Optional: running-config snapshot (before)
+    if args.snapshot:
+        _before = _snapshot(config, "before", args.snapshot)
+    else:
+        _before = None
+
+    id_counter = [1]
+    for entry in entries:
+        try:
+            perform_request(entry, config, args.raw, id_counter)
+        except Exception as e:
+            if args.cont:
+                print(f"⚠️  Continuing after error: {e}", file=sys.stderr)
+                continue
+            else:
+                # Optional: still take an 'after' snapshot on failure
+                if args.snapshot:
+                    _after = _snapshot(config, "after", args.snapshot)
+                    _snapshot_diff(_before, _after, args.snapshot)
+                sys.exit(1)
+
+    # Optional: running-config snapshot (after + diff)
+    if args.snapshot:
+        _after = _snapshot(config, "after", args.snapshot)
+        _snapshot_diff(_before, _after, args.snapshot)
+        print(
+            f"Snapshots: {args.snapshot}.before.txt | {args.snapshot}.after.txt | {args.snapshot}.diff.txt"
+        )
+
+def cmd_grep(args, config):
+    """Grep method names in the cached JSON spec"""
+    cache = config.get("json_spec_cache") or default_spec_cache
+    if not os.path.exists(cache):
+        print(
+            f"Spec cache not found at {cache}. Run '{os.path.basename(sys.argv[0])} update-spec'."
+        )
+        sys.exit(1)
+    with open(cache) as f:
+        spec = json.load(f)
+    term = args.term.lower()
+    matches = []
+    for m in spec.get("methods", []):
+        name = m.get("method-name", "")
+        if term in name.lower():
+            matches.append(name)
+    if matches:
+        for name in sorted(matches):
+            print(name)
+    else:
+        print(f"No methods matching '{args.term}' found.")
+
+def cmd_type(args, config):
+    """Show JSON for a specific type in the cached spec"""
+    cache = config.get("json_spec_cache") or default_spec_cache
+    if not os.path.exists(cache):
+        print(
+            f"Spec cache not found at {cache}. Run '{os.path.basename(sys.argv[0])} update-spec'."
+        )
+        sys.exit(1)
+    with open(cache) as f:
+        spec = json.load(f)
+    target = args.type_name
+    for t in spec.get("types", []):
+        if t.get("type-name") == target:
+            print(json.dumps(t, indent=2))
+            return
+    print(f"Type '{target}' not found in spec.")
+    sys.exit(1)
+
+def cmd_spec(args, config):
+    """Show spec details for a specific method name"""
+    cache = config.get("json_spec_cache") or default_spec_cache
+    if not os.path.exists(cache):
+        print(
+            f"Spec cache not found at {cache}. Run '{os.path.basename(sys.argv[0])} update-spec'."
+        )
+        sys.exit(1)
+    with open(cache) as f:
+        spec = json.load(f)
+    method = args.method_name
+    instances = [m for m in spec.get("methods", []) if m.get("method-name") == method]
+    if not instances:
+        print(f"Method '{method}' not found in spec.")
+        sys.exit(1)
+    for idx, inst in enumerate(instances, start=1):
+        params = inst.get("params", [])
+        print(f"Instance {idx}, {len(params)} parameters")
+        print(json.dumps(inst, indent=2))
+        print()
+
+def main():
+    prog_name = os.path.basename(sys.argv[0])
+    parser = argparse.ArgumentParser(prog=prog_name)
+    parser.add_argument(
+        "--config",
+        default=default_config_path,
+        help=f"Path to config file (default: ~/.gigswitch/config.yaml)",
+    )
+    sub = parser.add_subparsers(dest="command")  # subcommands optional
+
+    p_boot = sub.add_parser(
+        "bootstrap", help="Generate or edit config file and fetch spec"
+    )
+    p_boot.set_defaults(func=cmd_bootstrap)
+
+    p_spec = sub.add_parser(
+        "update-spec", help="Fetch and cache JSON-RPC spec inventory"
+    )
+    p_spec.set_defaults(func=cmd_update_spec)
+
+    p_call = sub.add_parser("call", help="Invoke a JSON-RPC method")
+    p_call.add_argument("method", help="RPC method name")
+    p_call.add_argument("params", nargs="*", help="Positional parameters")
+    p_call.add_argument(
+        "--raw", action="store_true", help="Show raw request and response"
+    )
+    p_call.set_defaults(func=cmd_call)
+
+    p_post = sub.add_parser(
+        "post",
+        help="Post JSON payload(s)",
+        formatter_class=argparse.RawTextHelpFormatter,  # <-- preserves newlines/indentation
+    )
+    p_post.add_argument("-d", "--data", help="Inline JSON data")
+    p_post.add_argument("-f", "--file", help="Read JSON from file")
+    p_post.add_argument(
+        "--raw", action="store_true", help="Show raw request and response"
+    )
+    p_post.add_argument(
+        "--continue",
+        dest="cont",
+        action="store_true",
+        help="Continue processing entries even if one fails",
+    )
+    p_post.add_argument(
+        "--jsonc",
+        action="store_true",
+        help="Treat input as JSONC (comments/trailing-commas allowed). Implied by .jsonc file extension.",
+    )
+    p_post.add_argument(
+        "--strict-json",
+        action="store_true",
+        help="Disable relaxed JSONC parsing (require strict JSON).",
+    )
+    p_post.add_argument(
+        "--vars",
+        action="append",
+        help="Vars file (YAML/JSON/.env). May be given multiple times; later files override earlier ones.",
+    )
+    p_post.add_argument(
+        "-D",
+        "--define",
+        action="append",
+        help="Inline var: KEY=VALUE. May repeat; overrides --vars.",
+    )
+    p_post.add_argument(
+        "--allow-env",
+        action="store_true",
+        help="Allow ${env:NAME} expansions from environment.",
+    )
+    p_post.add_argument(
+        "--allow-undefined",
+        action="store_true",
+        help="Leave ${VAR} tokens unexpanded instead of erroring.",
+    )
+    # NEW — emit JSONL to a file, with optional ID injection
+    p_post.add_argument("--emit-jsonl", help="Write normalized JSONL to this path.")
+    p_post.add_argument(
+        "--emit-add-id",
+        action="store_true",
+        help="Add sequential 'id' fields to entries that lack one when writing --emit-jsonl.",
+    )
+    p_post.add_argument(
+        "--emit-reseq",
+        action="store_true",
+        help="Resequence ALL entries' 'id' fields when writing --emit-jsonl.",
+    )
+    p_post.add_argument(
+        "--emit-id-start",
+        type=int,
+        default=1,
+        help="Starting id for --emit-jsonl numbering (default: 1).",
+    )
+    p_post.add_argument(
+        "--emit-only",
+        action="store_true",
+        help="Write --emit-jsonl output and exit without posting.",
+    )
+
+    # NEW — optional running-config snapshots (before/after) and a diff
+    p_post.add_argument(
+        "--snapshot",
+        metavar="BASE",
+        help="Base path to save running-config snapshots and diff (uses 'snapshot_cmd' from config; supports {host},{user},{password},{json_url}).",
+    )
+    p_post.epilog = (
+        "Accepted formats:\n"
+        '  • Single object: {"method":"...","params":[...]} \n'
+        "  • JSON Lines: one object per line\n"
+        '  • JSON array: [ {"method":"..."}, {"method":"..."} ]\n'
+        "  • Comments are allowed if specify --jsonc or extension ends in .jsonc\n"
+        "Missing 'id' fields are auto-assigned and will increment."
+    )
+    p_post.set_defaults(func=cmd_post)
+
+    p_grep = sub.add_parser("grep", help="Search methods in the cached JSON spec")
+    p_grep.add_argument("term", help="Search term")
+    p_grep.set_defaults(func=cmd_grep)
+
+    p_type = sub.add_parser(
+        "type", help="Show JSON for a specific type in the cached spec"
+    )
+    p_type.add_argument("type_name", help="Exact type-name to look up")
+    p_type.set_defaults(func=cmd_type)
+
+    p_specm = sub.add_parser("spec", help="Show spec details for a specific method name")
+    p_specm.add_argument("method_name", help="Exact method-name to look up")
+    p_specm.set_defaults(func=cmd_spec)
+
+    args = parser.parse_args()
+    # If no subcommand provided, show usage and hint to bootstrap
+    if not getattr(args, "command", None):
+        parser.print_help()
+        prog = os.path.basename(sys.argv[0])
+        print(
+            f"Configuration file not found or no command given. Run '{prog} bootstrap' to create it."
+        )
+        sys.exit(1)
+
+    # Ensure config for non-bootstrap commands
+    if args.command != "bootstrap" and not os.path.exists(args.config):
+        prog = os.path.basename(sys.argv[0])
+        print(
+            f"Configuration file not found at {args.config}. Run '{prog} bootstrap' to create it."
+        )
+        sys.exit(1)
+    if args.command == "bootstrap":
+        args.func(args)
+    else:
+        config = load_config(args.config)
+        if not config.get("json_url"):
+            print(f"Configuration missing. Run `{prog_name} bootstrap` first.")
+            sys.exit(1)
+        # Backfill snapshot_cmd default if missing
+        if "snapshot_cmd" not in config:
+            config["snapshot_cmd"] = default_snapshot_cmd
+            save_config(args.config, config)
+        args.func(args, config)
+
+if __name__ == "__main__":
+    main()

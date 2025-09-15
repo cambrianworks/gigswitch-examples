@@ -26,10 +26,10 @@ export GS_RECIPES=/path/to/recipes/examples
 - [X ports-list.md](ports-list.md)   List ports & capabilities
 - [enable-disable-ports.md](enable-disable-ports.md)   Enable and disable individual ports
 - [vlan-setup.md](vlan-setup.md)   VLAN configuration
+- [daisy-chain-vlan-10g-throughput.md](daisy-chain-vlan-10g-throughput.md)   Daisy chain 10G ports with VLANs to measure or verify throughput
 - [X snmp-setup.md](snmp-setup.md)   SNMP configuration
 - [X ptp-setup.md](ptp-setup.md)   PTP configuration
 - [X broadcast-storm.md](broadcast-storm.md)   Broadcast storm control
-- [X TBD.md](TBD.md)   Other example recipes
 
 ## Applying a Recipe
 

@@ -1,0 +1,35 @@
+// 10G Throughput Test Profile (JSONC w/ variables)
+// Purpose: isolate four 10G ports into a single access VLAN for throughput testing,
+// and avoid mixed saturation by using Private VLAN groups to keep streams separate.
+//
+// VARIABLES (see vars file):
+//   TEST_VLAN  - VLAN ID for the 10G string (default 28)
+//   PORT_A     - first 10G member (default "10G 1/1")
+//   PORT_B     - second 10G member (default "10G 1/2")
+//   PORT_C     - third 10G member (default "10G 1/3")
+//   PORT_AGG   - aggregation 10G port (default "10G 1/4")
+//   PVLAN_1    - PVLAN group id for A<->AGG (default 25)
+//   PVLAN_2    - PVLAN group id for B<->AGG (default 26)
+//   PVLAN_3    - PVLAN group id for C<->AGG (default 27)
+//
+// SAFETY: This profile disables MSTP on the listed 10G ports to prevent the
+// spanning-tree from blocking loops during back-to-back tests. Use only in a
+// lab / isolated environment.
+
+// --- 1) Assign the four 10G ports to access VLAN ${TEST_VLAN} and disable STP ---
+{"method":"vlan.config.interface.set","params":["${PORT_A}", {"Mode":"access","AccessVlan": ${TEST_VLAN}}]}
+{"method":"mstp.config.cist.interface.set","params":["${PORT_A}", {"Enable": false}]}
+
+{"method":"vlan.config.interface.set","params":["${PORT_B}", {"Mode":"access","AccessVlan": ${TEST_VLAN}}]}
+{"method":"mstp.config.cist.interface.set","params":["${PORT_B}", {"Enable": false}]}
+
+{"method":"vlan.config.interface.set","params":["${PORT_C}", {"Mode":"access","AccessVlan": ${TEST_VLAN}}]}
+{"method":"mstp.config.cist.interface.set","params":["${PORT_C}", {"Enable": false}]}
+
+{"method":"vlan.config.interface.set","params":["${PORT_AGG}", {"Mode":"access","AccessVlan": ${TEST_VLAN}}]}
+{"method":"mstp.config.cist.interface.set","params":["${PORT_AGG}", {"Enable": false}]}
+
+// --- 2) Private VLAN membership to keep each stream isolated to the AGG port ---
+{"method":"privateVlan.config.membership.add","params":[${PVLAN_1}, {"PortList":["${PORT_A}","${PORT_AGG}"]}]}
+{"method":"privateVlan.config.membership.add","params":[${PVLAN_2}, {"PortList":["${PORT_B}","${PORT_AGG}"]}]}
+{"method":"privateVlan.config.membership.add","params":[${PVLAN_3}, {"PortList":["${PORT_C}","${PORT_AGG}"]}]}
