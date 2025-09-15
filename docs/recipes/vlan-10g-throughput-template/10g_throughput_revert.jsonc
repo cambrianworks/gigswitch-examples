@@ -1,0 +1,24 @@
+// 10G Throughput Test - Revert Profile (JSONC w/ shared vars)
+// Purpose: remove PVLAN isolation for the 10G throughput test and (optionally)
+// re-enable MSTP on the 4x10G ports. Uses the same vars file (vars-10g.yaml).
+//
+// SAFE TO RUN: You can run with --continue so missing PVLAN groups won't abort.
+
+// --- 1) Clear the PVLAN isolation groups ---
+{"method":"privateVlan.config.membership.set","params":[${PVLAN_1}, {"PortList": []}]}
+{"method":"privateVlan.config.membership.set","params":[${PVLAN_2}, {"PortList": []}]}
+{"method":"privateVlan.config.membership.set","params":[${PVLAN_3}, {"PortList": []}]}
+
+// --- 2) (Optional) Re-enable MSTP on the 10G ports ---
+// IF MSTP was enabled originally, uncomment the four lines below to re-enable it.
+// {"method":"mstp.config.cist.interface.set","params":["${PORT_A}", {"Enable": true}]} 
+// {"method":"mstp.config.cist.interface.set","params":["${PORT_B}", {"Enable": true}]} 
+// {"method":"mstp.config.cist.interface.set","params":["${PORT_C}", {"Enable": true}]} 
+// {"method":"mstp.config.cist.interface.set","params":["${PORT_AGG}", {"Enable": true}]} 
+
+// --- 3) (Optional) Restore previous access VLANs ---
+// Define PREV_VLAN_A/B/C/AGG in your vars and uncomment to use:
+// {"method":"vlan.config.interface.set","params":["${PORT_A}", {"Mode":"access","AccessVlan": ${PREV_VLAN_A}}]}
+// {"method":"vlan.config.interface.set","params":["${PORT_B}", {"Mode":"access","AccessVlan": ${PREV_VLAN_B}}]}
+// {"method":"vlan.config.interface.set","params":["${PORT_C}", {"Mode":"access","AccessVlan": ${PREV_VLAN_C}}]}
+// {"method":"vlan.config.interface.set","params":["${PORT_AGG}", {"Mode":"access","AccessVlan": ${PREV_VLAN_AGG}}]}

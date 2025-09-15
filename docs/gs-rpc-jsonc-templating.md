@@ -12,13 +12,13 @@ This doc explains all the “advanced” features now available in `gs-rpc`:
 
 ## Install / Update
 
-On a Debian machine with Cambrian package access, install:
+On a Debian machine with Cambrian package access, install the latest stable version:
 
 ```bash
 sudo apt install gs-rpc
 ```
 
-Or, if you obtain an updated script directly, you can replace your existing script with:
+Or, the bleeding edge version is mainted in this repository in the `bin` directory and from that directory can be installed (or replace your existing script) with:
 ```bash
 sudo install -m 0755 ./gs-rpc /usr/local/bin/gs-rpc
 ```
