@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# gs-grab-running-config-wrapper
+# Simple Bash wrapper that reads ~/.gigswitch/config.yaml for json_url, username, password.
+# Optional first arg overrides host (useful if json_url uses localhost and port forward).
+# Then invokes:
+#     gs-grab-running-config <host> <user> <pass>
+set -euo pipefail
+
+cfg="${HOME}/.gigswitch/config.yaml"
+if [[ ! -f "$cfg" ]]; then
+  echo "ERROR: config not found: $cfg" >&2
+  exit 2
+fi
+
+# Tiny YAML reader for top-level keys: key: value
+read_yaml() {
+  local key="$1"
+  # Grab the first matching line, strip 'key:', trim spaces, drop surrounding quotes
+  local line
+  line="$(grep -E "^${key}:" "$cfg" | head -n1 || true)"
+  if [[ -z "${line}" ]]; then
+    echo ""
+    return 0
+  fi
+  line="${line#${key}:}"
+  # Trim leading/trailing whitespace
+  line="$(printf '%s' "$line" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')"
+  # Remove matching leading/trailing quotes if present
+  line="$(printf '%s' "$line" | sed -E 's/^"(.*)"$/\1/; s/^'\''(.*)'\''$/\1/')"
+  printf '%s' "$line"
+}
+
+json_url="$(read_yaml json_url)"
+username="$(read_yaml username)"
+password="$(read_yaml password)"
+
+if [[ -z "${json_url}" ]]; then
+  echo "ERROR: json_url missing in $cfg" >&2
+  exit 2
+fi
+
+# If first arg provided, use as host override
+host_override="${1-}"
+
+if [[ -n "${host_override}" ]]; then
+  host="$host_override"
+else
+  # Parse host from URL: strip scheme, strip path, strip port
+  host="$(printf '%s\n' "$json_url" \
+    | sed -E 's#^[a-zA-Z]+://##; s#/.*$##; s/:.*$//')"
+fi
+
+if [[ -z "${host}" ]]; then
+  echo "ERROR: could not determine host (url: '$json_url')" >&2
+  exit 2
+fi
+
+# Ensure the expect script is present
+if ! command -v gs-grab-running-config >/dev/null 2>&1; then
+  echo "ERROR: 'gs-grab-running-config' not found in PATH." >&2
+  exit 127
+fi
+
+# Call underlying expect script; stream output for redirection
+exec gs-grab-running-config "$host" "$username" "$password"

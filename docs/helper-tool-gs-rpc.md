@@ -1,8 +1,10 @@
 # gs-rpc
 
-Command line tool for sending json-rpc commands to GigSwitch, modeled after `vson`.
+Command line tool for sending json-rpc commands to GigSwitch, modeled after `vson` but extended to support jsonl for multiple inputs, jsonc for templating inputs with comments and variables, and support to snapshot the `running-config` before and after updates.
 
 This document shows how to install `gs-rpc` and gives some example commands as well as compares to the `vson` tool.
+
+For more advanced templating with `jsonc`, see: [gs-rpc-jsonc-templating](gs-rpc-jsonc-templating.md).
 
 ## Install
 

@@ -1,0 +1,47 @@
+#!/usr/bin/expect -f
+# gs-grab-running-config
+# Args (positional): <host> <user> <pass>
+# Example:
+#   ./gs-grab-running-config microchip admin 'yourpass' > running-config.txt
+#
+# Notes:
+# - This issues ICLI commands: disables pager and runs `show running-config`.
+# - Keep it simple: just logs in, runs the two commands, exits.
+
+set timeout 60
+
+if {$argc != 3} {
+  puts stderr "usage: $argv0 <host> <user> <pass>"
+  exit 2
+}
+
+set host [lindex $argv 0]
+set user [lindex $argv 1]
+set pass [lindex $argv 2]
+
+# Force TTY; some CLIs need -tt
+spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -tt $user@$host
+
+# Login
+expect {
+  -re "(?i)password:" { send "$pass\r"; exp_continue }
+  -re {[#>]\s*$}      { }  ;# at CLI prompt
+  timeout             { exit 1 }
+}
+
+# Disable pager (even if you've set it on vty, do it again just in case)
+send "terminal length 0\r"
+expect -re {[#>]\s*$}
+
+# Show running-config and wait for prompt to return
+send "show running-config\r"
+# Stream the output through until we get the prompt back.
+# We don't try to parse; just pass-through.
+expect {
+  -re {[#>]\s*$} { }    ;# prompt back
+  timeout         { }   ;# in case the device is slow/paged, we still emit what we have
+}
+
+# Quit
+send "exit\r"
+expect eof
