@@ -174,6 +174,51 @@ VirtualPort  Enabled  PTP-State  Io-pin
 
 Or, `show ptp 0 port-state` to output for all ports.
 
+### Check with tcpdump
+
+Above, `GigabitEthernet 1/24` had `ptp 0` added to the interface. In this lab config, the IP addresses are:
+`GigSwitch`: `192.168.129.15`
+`Time Machine`: `192.168.129.61` (ptp grandmaster)
+
+Here's an example `tcpdump` from a machine directly connected to this port on its `eth0`:
+
+Before configuring ANY ports with `ptp 0`, traffic is seen from the grandmaster (install `tcpdump` and adjust `eth0` as needed):
+```
+$ sudo tcpdump -i eth0 -nn -e -vv -s 1500 udp port 319 or udp port 320
+    192.168.129.61.319 > 224.0.1.129.319: [no cksum] PTPv2, v1 compat : no, msg type : sync msg, length : 44, domain : 0, reserved1 : 0, Flags [two step], NS correction : 0, sub NS correction : 0, reserved2 : 0, clock identity : 0x28b5e8fffe4afda3, port id : 1, seq id : 32733, control : 0 (Sync), log message interval : 254, originTimeStamp : 0 seconds, 0 nanoseconds
+19:39:48.438176 28:b5:e8:4a:fd:a3 > 01:00:5e:00:01:81, ethertype IPv4 (0x0800), length 86: (tos 0x0, ttl 1, id 38721, offset 0, flags [DF], proto UDP (17), length 72)
+    192.168.129.61.320 > 224.0.1.129.320: [no cksum] PTPv2, v1 compat : no, msg type : follow up msg, length : 44, domain : 0, reserved1 : 0, Flags [none], NS correction : 0, sub NS correction : 0, reserved2 : 0, clock identity : 0x28b5e8fffe4afda3, port id : 1, seq id : 32733, control : 0 (Sync), log message interval : 254, preciseOriginTimeStamp : 1759347625 seconds, 362180062 nanoseconds
+```
+
+You'll note above that the destination is multicast address `224.0.1.129`. An alternative `tcpdump` with this in mind is:
+
+```
+sudo tcpdump -n -i eth0 -s0 -vv -e host 224.0.1.129
+```
+
+If you've configured the `GigSwitch` for ptp and have ONLY enabled your external interface with `ptp 0` then there will be NO PTP TRAFFIC seen emerging on other ports (until/unless you've configured them):
+
+```
+$ sudo tcpdump -i eth0 -nn -e -vv -s 1500 udp port 319 or udp port 320
+(no output)
+```
+
+This is because you've told the switch to pay attention to ptp traffic and it will no longer generate or forward ptp traffic until you've enabled specific interfaces.
+
+Then, after configuring for `ptp 0` on port `GigabitEthernet 1/24`, ptp traffic is seen from the `GigSwitch` instead (since the `GigSwitch` is watching ptp and can run as a master):
+```
+$ sudo tcpdump -n -i eth0 -s0 -vv -e host 224.0.1.129
+    192.168.129.15.319 > 224.0.1.129.319: [no cksum] PTPv2, v1 compat : no, msg type : sync msg, length : 44, domain : 0, reserved1 : 0, Flags [two step], NS correction : 0, sub NS correction : 0, reserved2 : 0, clock identity : 0x8227c7fffe4dae01, port id : 24, seq id : 1, control : 0 (Sync), log message interval : 0, originTimeStamp : 0 seconds, 0 nanoseconds
+19:49:52.062774 82:27:c7:4d:ae:01 > 01:00:5e:00:01:81, ethertype IPv4 (0x0800), length 86: (tos 0x0, ttl 128, id 0, offset 0, flags [none], proto UDP (17), length 72)
+    192.168.129.15.320 > 224.0.1.129.320: [no cksum] PTPv2, v1 compat : no, msg type : follow up msg, length : 44, domain : 0, reserved1 : 0, Flags [none], NS correction : 0, sub NS correction : 0, reserved2 : 0, clock identity : 0x8227c7fffe4dae01, port id : 24, seq id : 85, control : 2 (Follow_Up), log message interval : 0, preciseOriginTimeStamp : 92 seconds, 637556112 nanoseconds
+```
+
+If you don't see any traffic, ensure you have configured ptp with UDP multicast and that your networking path isn't blocking these datagrams. If you (intentionally or) unintentionally configured for raw ethernet instead, you should see these types of messages with `proto 0x88f7`:
+
+```
+sudo tcpdump -i eth0 -vv -s0 ether proto 0x88f7
+```
+
 ## Recipe: PPS Input/Output (SMA Ports)
 
 This section discusses use of the SMA coax ports for PPS in and out.
@@ -191,7 +236,23 @@ ptp 2 virtual-port mode pps-in 5
 
 ### Check pps in
 
-TODO
+From `icli`, you can watch for statistics and missed events from debug mode.
+
+```shell
+# platform debug allow
+# debug ptp pps-tod statistics
+one_tod_cnt            :              0
+one_pps_cnt            :            145
+missed_one_pps_cnt     :              0
+missed_tod_rx_cnt      :              0
+```
+
+If input pps hasn't been successfully configured (and connected), you'll see 0 for all outputs.
+
+Restart counters at 0 with:
+```shell
+# debug ptp pps-tod statistics clear
+```
 
 ### Configure pps out
 
