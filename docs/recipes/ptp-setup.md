@@ -264,3 +264,100 @@ ptp 2 virtual-port mode pps-out 4
 ### Check pps out
 
 TODO
+
+## Recipe: PTP as Standalone Master
+
+This config sets up the switch as a master on the network without having it synchronized to an actual ptp grandmaster with accurate time. Therefore, the usage is limited but can show sending of ptp UDP packets albeit marked with fields indicating low quality and others missing.
+
+### Enable Time Sync with NTP
+
+You'll want to put some reasonable time into your PTP clock. We can get that from system time but let's first make system time accurate with ntp.
+
+`icli`:
+```shell
+configure terminal
+ntp
+ntp server 1 ip-address IP_ADDRESS_OF_ACCESSIBLE_SERVER
+```
+
+### Configure PTP as Master
+
+Here, we'll use `ptp 2` and `domain 1` just to highlight something other than defaults of 0.
+
+`icli`:
+```shell
+configure terminal
+ptp 2 mode master twostep ip4multi twoway vid 1 0 clock-domain 1
+ptp 2 domain 1
+```
+
+The following are included for reference but do not appear to affect the actual packets sent:
+`icli`:
+```shell
+configure terminal
+ptp 2 time-property utc-offset 37 valid
+ptp 2 time-property ptptimescale
+ptp 2 time-property time-source 160
+ptp 2 virtual-port time-property utc-offset 37 valid ptptimescale time-source 160
+```
+
+Since ntp is running, we'll show our ptp clock has the incorrect time then update it.
+
+`icli`:
+```shell
+# show ptp 0 local-clock
+PTP Time (0)    : 1970-01-01T01:14:39+00:00 236,823,444
+Clock Adjustment method: Internal Timer
+```
+
+Since ntp is setting the system-time, we'll grab from it and copy to ptp 2 then print the value:
+`icli`:
+```shell
+configure terminal
+ptp system-time get 2
+exit
+show ptp 2 local-clock
+PTP Time (2)    : 2025-10-01T23:03:03+00:00 968,976,017
+Clock Adjustment method: Internal Timer
+```
+
+Below, you can see that the `Valid` field of `time-property` is False (among other things) but that won't prevent you from sending some test packets out as a master.
+
+`icli`:
+```
+# show ptp 0 time-property
+UtcOffset  Valid  leap59  leap61  TimeTrac  FreqTrac  ptpTimeScale  TimeSource
+---------  -----  ------  ------  --------  --------  ------------  ----------
+0          False  False   False   False     False     True          160
+```
+
+To send on a port, we must enable ptp on that part. Again, we'll use `GigabitEthernet 1/24`:
+`icli`:
+```shell
+configure terminal
+interface GigabitEthernet 1/24
+ptp 2
+```
+
+If everything worked, ptp UDP packets should start flowing on `GigabitEthernet 1/24`.
+
+### Check UDP PTP Packets with tcpdump
+
+Below is an example capture from a device plugged in to `GigabitEthernet 1/24`:
+
+```bash
+$ sudo tcpdump -i eth0 -nn -e -vv -s 1500 host IP_ADDRESS_OF_SWITCH
+    192.168.129.15.320 > 224.0.1.129.320: [no cksum] PTPv2, v1 compat : no, msg type : announce msg, length : 64, domain : 1, reserved1 : 0, Flags [timescale], NS correction : 0, sub NS correction : 0, reserved2 : 0, clock identity : 0x8227c7fffe4dae01, port id : 24, seq id : 961, control : 5 (Other), log message interval : 1, originTimeStamp : 0 seconds 0 nanoseconds, origin cur utc :0, rsvd : 0, gm priority_1 : 128, gm clock class : 187, gm clock accuracy : 254, gm clock variance : 65535, gm priority_2 : 128, gm clock id : 0x8227c7fffe4dae01, steps removed : 0, time source : 0xa0
+```
+
+Since we are demonstrating sending as a master without a true time source, just note that some of the values above are not great for actual ptp synchronization.
+
+* Domain: 1
+* Flags: [timescale] only → PTP timescale bit is set, but UTC-offset-valid is not set.
+* currentUtcOffset: 0 → needs to be 37.
+* GM clockClass: 187 → default "other." For a free-running GM, use 248.
+* GM accuracy: 254 (unknown) → fine if you don't want to claim accuracy.
+* GM variance: 65535 → fine for "don't claim".
+* TimeSource: 0xa0 (= 160, internal osc) → already matches your config.
+
+But, POC for sending PTP without synchronization to a grandmaster is demonstrated.
