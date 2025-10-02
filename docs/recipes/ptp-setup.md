@@ -12,6 +12,13 @@ Many switches and devices can also generate physical timing signals such as 1 PP
 
 The GigSwitch includes dedicated SMA ports for precise timing: PTP_IN (3.3 V PPS input), PTP_OUT (PPS output), and two “station clock” ports (CKSTATION_I/O) that can accept or provide a continuous frequency reference. The PPS signals allow external timing equipment (such as a GPS-disciplined clock) to discipline the switch’s internal PTP clock or, conversely, let the switch provide a stable PPS output to downstream devices. These ports are intended for high-precision phase alignment in applications such as high-speed networking and distributed system synchronization.
 
+## Additional Documentation
+
+PTP is discussed in the following documents for calibration and configuration:
+
+* [AN1294-SW_Configuration_Guide_PTP_Calibration.pdf](https://ww1.microchip.com/downloads/secure/aemDocuments/documents/UNG/ApplicationNotes/ApplicationNotes/AN1294-SW_Configuration_Guide_PTP_Calibration.pdf); [an1294 parent page](https://www.microchip.com/en-us/application-notes/an1294)
+* [AN1295-PTP_Configuration_Guide.pdf](https://ww1.microchip.com/downloads/secure/aemDocuments/documents/UNG/ApplicationNotes/ApplicationNotes/AN1295-PTP_Configuration_Guide.pdf); [an1295 parent page](https://www.microchip.com/en-us/application-notes/an1295)
+
 ## Recipe: Getting PTP from a Network Grandmaster
 
 If you have a PTP grandmaster sending multicast UDP on **domain 0** (the most common setup), you can configure PTP as follows. This example also assumes the default VLAN 1 (`vid 1 0` = VLAN 1, PCP 0).
@@ -313,13 +320,16 @@ Clock Adjustment method: Internal Timer
 Since ntp is setting the system-time, we'll grab from it and copy to ptp 2 then print the value:
 `icli`:
 ```shell
-configure terminal
-ptp system-time get 2
-exit
-show ptp 2 local-clock
+# configure terminal
+(config)# ptp system-time get 2
+System clock synch mode (Get PTP time from System time)
+(config)# exit
+# show ptp 2 local-clock
 PTP Time (2)    : 2025-10-01T23:03:03+00:00 968,976,017
 Clock Adjustment method: Internal Timer
 ```
+
+**NOTE**: Though the wording is "synch mode" and the `system-time get` command is saved to `running-config` (and copied to `startup-config` if persisted), it looks like this command must be run again after reboot to synch the ptp clock from system time.
 
 Below, you can see that the `Valid` field of `time-property` is False (among other things) but that won't prevent you from sending some test packets out as a master.
 
