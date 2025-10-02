@@ -11,21 +11,21 @@
   "oneWay": false,
   "domainNumber": ${PTP_DOMAIN},
   "protocol": "ethip4",
-  "vid": ${VID:-1},
-  "pcp": ${PCP:-0},
+  "vid": ${VID},
+  "pcp": ${PCP},
   "mep": -1,
   "clkDom": ${CLOCK_DOMAIN},
   "dscp": 0,
-  "profile": "${PROFILE:-ieee1588}",
+  "profile": "${PROFILE}",
   "localPriority": 128
 }]}
 
 // 2) Cosmetic time-properties (do not improve quality)
 {"method":"ptp.config.clocks.timePropertiesDs.set","params":[ ${PTP_ID}, {
-  "currentUtcOffset": ${UTC_OFFSET:-37},
+  "currentUtcOffset": ${UTC_OFFSET},
   "currentUtcOffsetValid": true,
   "ptpTimescale": true,
-  "timeSource": ${TIME_SOURCE:-160}
+  "timeSource": ${TIME_SOURCE}
 }]}
 
 // 3) Downstreams as masterOnly

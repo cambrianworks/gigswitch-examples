@@ -6,26 +6,28 @@
 {"method":"ptp.config.clocks.defaultDs.add","params":[ ${PTP_ID}, {
   "deviceType": "ordBound",
   "twoStepFlag": true,
-  "priority1": ${PRIORITY1:-128},
+  "priority1": ${PRIORITY1},
   "priority2": 128,
   "oneWay": false,
   "domainNumber": ${PTP_DOMAIN},
-  "protocol": "ethip4",
-  "vid": ${VID:-1},
-  "pcp": ${PCP:-0},
-  "mep": -1,
+  "protocol": "ip4multi",
+  "vid": ${VLAN_ID},
+  "pcp": ${PCP},
+  "mep": 1,
   "clkDom": ${CLOCK_DOMAIN},
   "dscp": 0,
-  "profile": "${PROFILE:-ieee1588}",
-  "localPriority": 128
+  "profile": "${PROFILE}",
+  "localPriority": 128,
+  "filterType": "basicPhaseLow",
+  "pathTraceEnable": false
 }]}
 
 // 2) Uplink (toward GM): enable; not masterOnly
 {"method":"ptp.config.clocks.portDs.set","params":[ ${PTP_ID}, "${UPLINK_IFNAME}", {
   "enabled": true,
-  "logAnnounceInterval": ${ANNOUNCE_INT:-1},
+  "logAnnounceInterval": ${ANNOUNCE_INT},
   "announceReceiptTimeout": 3,
-  "logSyncInterval": ${SYNC_INT:-0},
+  "logSyncInterval": ${SYNC_INT},
   "delayMechanism": "e2e",
   "logMinPdelayReqInterval": 0,
   "delayAsymmetry": 0,
@@ -38,9 +40,9 @@
 // Duplicate these lines to add more ports
 {"method":"ptp.config.clocks.portDs.set","params":[ ${PTP_ID}, "${DOWNSTREAM1_IFNAME}", {
   "enabled": true,
-  "logAnnounceInterval": ${ANNOUNCE_INT:-1},
+  "logAnnounceInterval": ${ANNOUNCE_INT},
   "announceReceiptTimeout": 3,
-  "logSyncInterval": ${SYNC_INT:-0},
+  "logSyncInterval": ${SYNC_INT},
   "delayMechanism": "e2e",
   "logMinPdelayReqInterval": 0,
   "delayAsymmetry": 0,
@@ -50,9 +52,9 @@
 }]}
 {"method":"ptp.config.clocks.portDs.set","params":[ ${PTP_ID}, "${DOWNSTREAM2_IFNAME}", {
   "enabled": true,
-  "logAnnounceInterval": ${ANNOUNCE_INT:-1},
+  "logAnnounceInterval": ${ANNOUNCE_INT},
   "announceReceiptTimeout": 3,
-  "logSyncInterval": ${SYNC_INT:-0},
+  "logSyncInterval": ${SYNC_INT},
   "delayMechanism": "e2e",
   "logMinPdelayReqInterval": 0,
   "delayAsymmetry": 0,

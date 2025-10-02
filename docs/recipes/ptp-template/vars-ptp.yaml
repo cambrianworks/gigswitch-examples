@@ -3,11 +3,11 @@
 
 # Core
 PTP_ID: 0
-CLOCK_DOMAIN: 0
+CLOCK_DOMAIN: 1
 PTP_DOMAIN: 0
-PROFILE: "ieee1588"
+PROFILE: "noProfile"
 PRIORITY1: 128
-VID: 1
+VLAN_ID: 1
 PCP: 0
 
 # Uplink and downstream port names
