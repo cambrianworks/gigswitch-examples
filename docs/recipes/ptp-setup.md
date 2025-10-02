@@ -113,10 +113,12 @@ copy running-config startup-config
 
 ### JSON-RPC / JSONC equivalent
 
-Post the **boundary clock** profile (uplink: `Gi 1/25`, downstream: `Gi 1/24` & `Gi 1/1` from vars):
+The `ptp-boundary-clock.jsonc` template is reused below to also attach the ptp instance to interfaces but we will simply give illegal names to the interfaces so those last commands will fail here.
+
+Post the **boundary clock** profile (uplink: `Gi 1/25`, downstream: override until later section):
 
 ```bash
-gs-rpc post --continue --raw --vars ./ptp-template/vars-ptp.yaml -f ./ptp-template/ptp-boundary-clock.jsonc
+gs-rpc post --continue --raw --vars ./ptp-template/vars-ptp.yaml -D DOWNSTREAM1_IFNAME="IGN" -D DOWNSTREAM2_IFNAME="IGN" -f ./ptp-template/ptp-boundary-clock.jsonc
 ```
 
 
@@ -144,9 +146,8 @@ copy running-config startup-config
 
 Copy PTP (clock-domain 0) → system clock.
 
-```jsonc
-{"method":"ptp.control.clocks.set","params":[ 0, { "syncToSystemClock": 1 } ]}
-```
+The first param is a "clock_id" which likely refers to "clock-domain".
+The second object argument just has one field named "syncToSystemClock".
 
 ```bash
 gs-rpc post --continue --raw -d '{"method":"ptp.control.clocks.set","params":[ 0, { "syncToSystemClock": 1 } ]}'
@@ -250,10 +251,12 @@ sudo tcpdump -i eth0 -vv -s0 ether proto 0x88f7
 
 ### JSON-RPC / JSONC equivalent
 
-Update the `.jsonc` file as appropriate depending on if you already have ntp client configured or not.
+Below, this reuses the `ptp-boundary-clock.jsonc` partly configured above but now sets up ptp on two downstream interfaces.
+
+Post the **boundary clock** profile (uplink: `Gi 1/25`, downstream: `Gi 1/24` from vars):
 
 ```bash
-gs-rpc post --continue --raw --vars ./ptp-template/vars-ptp.yaml -D NTP_SERVER="192.168.1.10" -f ./ptp-template/ptp-boundary-clock.jsonc
+gs-rpc post --continue --raw --vars ./ptp-template/vars-ptp.yaml -D DOWNSTREAM2_IFNAME="IGN" -f ./ptp-template/ptp-boundary-clock.jsonc
 ```
 
 
@@ -425,13 +428,14 @@ Run the **master-only POC**:
 If you don't have ntp enabled on your machine, configure that first (update to IP of available ntp server):
 
 ```bash
+gs-rpc call ntp.config.global.set true
 gs-rpc post --continue --raw -D NTP_SERVER="IP_ADDRESS_OF_ACCESSIBLE_SERVER" -d '{"method":"ntp.config.servers.set","params":[1, {"in4":{"addr":"${NTP_SERVER}"}}]}'
 ```
 
 **NOTE**: If you are just now enabling ntp, please wait a bit to allow clock to synchronize.
 
 ```bash
-gs-rpc post --continue --raw --vars ./ptp-template/vars-ptp.yaml -D PTP_ID=2 -D PTP_DOMAIN=1 -f ./ptp-template/ptp-master-only-poc.jsonc
+gs-rpc post --continue --raw --vars ./ptp-template/vars-ptp.yaml -D PTP_ID=2 -D PTP_DOMAIN=1 -D DOWNSTREAM2_IFNAME="IGN" -f ./ptp-template/ptp-master-only-poc.jsonc
 ```
 
 ---
