@@ -429,7 +429,7 @@ If you don't have ntp enabled on your machine, configure that first (update to I
 
 ```bash
 gs-rpc call ntp.config.global.set true
-gs-rpc post --continue --raw -D NTP_SERVER="IP_ADDRESS_OF_ACCESSIBLE_SERVER" -d '{"method":"ntp.config.servers.set","params":[1, {"in4":{"addr":"${NTP_SERVER}"}}]}'
+gs-rpc post -d '{"method":"ntp.config.servers.set","params":[1, "IP_ADDRESS_OF_ACCESSIBLE_SERVER"]}'
 ```
 
 **NOTE**: If you are just now enabling ntp, please wait a bit to allow clock to synchronize.
