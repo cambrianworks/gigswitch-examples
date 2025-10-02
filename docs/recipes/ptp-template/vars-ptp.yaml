@@ -1,0 +1,34 @@
+# reference from gs-rpc with "--vars ptp-template/vars-ptp.yaml"
+# override on gs-rpc command line with "-D name=value"
+
+# Core
+PTP_ID: 0
+CLOCK_DOMAIN: 0
+PTP_DOMAIN: 0
+PROFILE: "ieee1588"
+PRIORITY1: 128
+VID: 1
+PCP: 0
+
+# Uplink and downstream port names
+UPLINK_IFNAME: "Gi 1/25"
+DOWNSTREAM1_IFNAME: "Gi 1/24"
+DOWNSTREAM2_IFNAME: "Gi 1/1"
+# Add more vars as needed and duplicate lines in .jsonc
+# for more interfaces. Else need some sort of loop support
+# or separate shell script.
+
+# Intervals (defaults; positive = seconds, negative = packets/sec)
+ANNOUNCE_INT: 1
+SYNC_INT: 0
+DREQ_INT: 0
+
+# PPS pins (fixed)
+PPS_IN_PIN: 5
+PPS_OUT_PIN: 4
+PPS_OUT_DELAY: 0
+
+# Master-only PoC extras
+UTC_OFFSET: 37
+TIME_SOURCE: 160
+GM_CLOCK_CLASS: 248

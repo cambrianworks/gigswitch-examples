@@ -111,6 +111,15 @@ If you're happy with ptp settings, you can persist them from `icli` by copying t
 copy running-config startup-config
 ```
 
+### JSON-RPC / JSONC equivalent
+
+Post the **boundary clock** profile (uplink: `Gi 1/25`, downstream: `Gi 1/24` & `Gi 1/1` from vars):
+
+```bash
+gs-rpc post --continue --raw --vars ./ptp-template/vars-ptp.yaml -f ./ptp-template/ptp-boundary-clock.jsonc
+```
+
+
 ## Recipe: Copying PTP to System Time
 
 From `icli` `configure terminal` mode, run:
@@ -130,6 +139,19 @@ copy running-config startup-config
 ```
 
 - Interim workaround: re-run `ptp system-time set` after each reboot, or set system time with NTP.
+
+### JSON-RPC / JSONC equivalent
+
+Copy PTP (clock-domain 0) → system clock.
+
+```jsonc
+{"method":"ptp.control.clocks.set","params":[ 0, { "syncToSystemClock": 1 } ]}
+```
+
+```bash
+gs-rpc post --continue --raw -d '{"method":"ptp.control.clocks.set","params":[ 0, { "syncToSystemClock": 1 } ]}'
+```
+
 
 ## Recipe: Serving PTP on Network Interfaces
 
@@ -226,6 +248,15 @@ If you don't see any traffic, ensure you have configured ptp with UDP multicast 
 sudo tcpdump -i eth0 -vv -s0 ether proto 0x88f7
 ```
 
+### JSON-RPC / JSONC equivalent
+
+Update the `.jsonc` file as appropriate depending on if you already have ntp client configured or not.
+
+```bash
+gs-rpc post --continue --raw --vars ./ptp-template/vars-ptp.yaml -D NTP_SERVER="192.168.1.10" -f ./ptp-template/ptp-boundary-clock.jsonc
+```
+
+
 ## Recipe: PPS Input/Output (SMA Ports)
 
 This section discusses use of the SMA coax ports for PPS in and out.
@@ -271,6 +302,21 @@ ptp 2 virtual-port mode pps-out 4
 ### Check pps out
 
 TODO
+
+### JSON-RPC / JSONC equivalent
+
+**PPS IN** (fixed pin from vars):
+
+```bash
+gs-rpc post --continue --raw --vars ./ptp-template/vars-ptp.yaml -D PTP_ID=2 -f ./ptp-template/pps-in-only.jsonc
+```
+
+**PPS OUT** (fixed pin and optional delay from vars):
+
+```bash
+gs-rpc post --continue --raw --vars ./ptp-template/vars-ptp.yaml -D PTP_ID=2 -f ./ptp-template/pps-out-only.jsonc
+```
+
 
 ## Recipe: PTP as Standalone Master
 
@@ -371,3 +417,32 @@ Since we are demonstrating sending as a master without a true time source, just 
 * TimeSource: 0xa0 (= 160, internal osc) → already matches your config.
 
 But, POC for sending PTP without synchronization to a grandmaster is demonstrated.
+
+### JSON-RPC / JSONC equivalent
+
+Run the **master-only POC**:
+
+If you don't have ntp enabled on your machine, configure that first (update to IP of available ntp server):
+
+```bash
+gs-rpc post --continue --raw -D NTP_SERVER="IP_ADDRESS_OF_ACCESSIBLE_SERVER" -d '{"method":"ntp.config.servers.set","params":[1, {"in4":{"addr":"${NTP_SERVER}"}}]}'
+```
+
+**NOTE**: If you are just now enabling ntp, please wait a bit to allow clock to synchronize.
+
+```bash
+gs-rpc post --continue --raw --vars ./ptp-template/vars-ptp.yaml -D PTP_ID=2 -D PTP_DOMAIN=1 -f ./ptp-template/ptp-master-only-poc.jsonc
+```
+
+---
+
+## gs-rpc Variable Notes
+
+The recipes have equivalent **JSONC** profiles that can be posted with **gs-rpc**.
+Variables come from `./ptp-template/vars-ptp.yaml` (you can override with `-D KEY=VALUE`).
+Recommended order: `--vars … [-D KEY=VALUE …] -f <profile.jsonc>`.
+
+**Variable precedence (later wins):**
+1. `--vars FILE` (repeatable; later files override earlier ones)
+2. `-D KEY=VALUE` (inline CLI overrides on top of vars files)
+3. `${env:NAME}` only if `--allow-env` is used can read variables from environment
