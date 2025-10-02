@@ -440,7 +440,7 @@ gs-rpc post --continue --raw --vars ./ptp-template/vars-ptp.yaml -D PTP_ID=2 -D 
 
 The recipes have equivalent **JSONC** profiles that can be posted with **gs-rpc**.
 Variables come from `./ptp-template/vars-ptp.yaml` (you can override with `-D KEY=VALUE`).
-Recommended order: `--vars … [-D KEY=VALUE …] -f <profile.jsonc>`.
+Recommended order: `--vars ... [-D KEY=VALUE ...] -f <profile.jsonc>`.
 
 **Variable precedence (later wins):**
 1. `--vars FILE` (repeatable; later files override earlier ones)
