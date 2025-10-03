@@ -28,7 +28,7 @@ export GS_RECIPES=/path/to/recipes/examples
 - [vlan-setup.md](vlan-setup.md)   VLAN configuration
 - [daisy-chain-vlan-10g-throughput.md](daisy-chain-vlan-10g-throughput.md)   Daisy chain 10G ports with VLANs to measure or verify throughput
 - [X snmp-setup.md](snmp-setup.md)   SNMP configuration
-- [X ptp-setup.md](ptp-setup.md)   PTP configuration
+- [ptp-setup.md](ptp-setup.md)   PTP configuration
 - [X broadcast-storm.md](broadcast-storm.md)   Broadcast storm control
 
 ## Applying a Recipe

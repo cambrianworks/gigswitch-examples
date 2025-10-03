@@ -1,0 +1,49 @@
+// Proof-of-concept: act as a MASTER without a high-quality source.
+// Assumes ntp or some other method has set correct system time.
+// Ports used: "${DOWNSTREAM1_IFNAME}", "${DOWNSTREAM2_IFNAME}".
+
+// 1) Clock defaultDs as masterOnly
+{"method":"ptp.config.clocks.defaultDs.add","params":[ ${PTP_ID}, {
+  "deviceType": "masterOnly",
+  "twoStepFlag": true,
+  "priority1": 128,
+  "priority2": 128,
+  "oneWay": false,
+  "domainNumber": ${PTP_DOMAIN},
+  "protocol": "ip4multi",
+  "vid": ${VLAN_ID},
+  "pcp": ${PCP},
+  "mep": 1,
+  "clkDom": ${CLOCK_DOMAIN},
+  "dscp": 0,
+  "profile": "${PROFILE}",
+  "localPriority": 128,
+  "filterType": "basicPhaseLow",
+  "pathTraceEnable": false
+}]}
+
+// 2) Cosmetic time-properties (do not improve quality)
+{"method":"ptp.config.clocks.timePropertiesDs.set","params":[ ${PTP_ID}, {
+  "currentUtcOffset": ${UTC_OFFSET},
+  "currentUtcOffsetValid": true,
+  "ptpTimescale": true,
+  "timeSource": ${TIME_SOURCE}
+}]}
+
+// 3) Downstreams as masterOnly
+{"method":"ptp.config.clocks.portDs.set","params":[ ${PTP_ID}, "${DOWNSTREAM1_IFNAME}", {
+  "enabled": true,
+  "masterOnly": true,
+  "logAnnounceInterval": 1,
+  "announceReceiptTimeout": 3,
+  "logSyncInterval": 0,
+  "delayMechanism": "e2e"
+}]}
+{"method":"ptp.config.clocks.portDs.set","params":[ ${PTP_ID}, "${DOWNSTREAM2_IFNAME}", {
+  "enabled": true,
+  "masterOnly": true,
+  "logAnnounceInterval": 1,
+  "announceReceiptTimeout": 3,
+  "logSyncInterval": 0,
+  "delayMechanism": "e2e"
+}]}
