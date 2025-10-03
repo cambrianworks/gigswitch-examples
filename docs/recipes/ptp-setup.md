@@ -146,11 +146,10 @@ copy running-config startup-config
 
 Copy PTP (clock-domain 0) → system clock.
 
-The first param is a "clock_id" which likely refers to "clock-domain".
-The second object argument just has one field named "syncToSystemClock".
+Supported values for the 2nd argument are: "systemTimeNoSync", "systemTimeSyncSet", "systemTimeSyncGet".
 
 ```bash
-gs-rpc post --continue --raw -d '{"method":"ptp.control.clocks.set","params":[ 0, { "syncToSystemClock": 1 } ]}'
+gs-rpc post --continue --raw -d '{"method":"ptp.config.global.systemTimeSyncMode.set","params":[{"mode":"systemTimeSyncSet"}]}'
 ```
 
 
@@ -436,6 +435,12 @@ gs-rpc post -d '{"method":"ntp.config.servers.set","params":[1, "IP_ADDRESS_OF_A
 
 ```bash
 gs-rpc post --continue --raw --vars ./ptp-template/vars-ptp.yaml -D PTP_ID=2 -D PTP_DOMAIN=1 -D DOWNSTREAM2_IFNAME="IGN" -f ./ptp-template/ptp-master-only-poc.jsonc
+```
+
+Above, we had an `icli` command for copying system-time to ptp 2. This doesn't quite appear to be available in json-rpc as there is no id argument. So, you'll need to use `icli` as above to set your clock since below will only work for whatever values are hard-coded for ptp id or clock-domain. It looks like `icli` can specify a ptp id but the json-rpc will tie to whatever ptp is on clock-domain 0.
+
+```bash
+gs-rpc post --continue --raw -d '{"method":"ptp.config.global.systemTimeSyncMode.set","params":[{"mode":"systemTimeSyncGet"}]}'
 ```
 
 ---
