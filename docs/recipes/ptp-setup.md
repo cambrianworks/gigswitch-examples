@@ -54,9 +54,10 @@ The following settings will usually autopopulate, and you normally don’t need 
 ```
 
 #### Interval Values
-- `0` = default, typically **1 per second**
-- Positive numbers = interval in **seconds** (e.g. `3 = 1 every 3 seconds`)
-- Negative numbers = **rate per second** (e.g. `-3 = 3 per second`)
+- Generally, for a value V, the interval is 2^V seconds.
+- 0 (typical default) → 2^0 = 1 second (1 message per second)
+- Positive numbers (e.g. 3) → 2^3 = 8 seconds (1 every 8 seconds)
+- Negative numbers (e.g. -3) → 2^−3 = 1/8 second (i.e., 8 per second)
 
 #### Priority Settings
 
@@ -64,6 +65,8 @@ By default, `priority1` is **128**. Lower values mean higher priority.
 To help ensure the network grandmaster wins, either:
 - leave `priority1` unset, or
 - explicitly set a higher value (e.g. `ptp 0 priority1 200`).
+
+Some profiles/modes might force `priority1` to a fixed value and then, if all other comparisons are equivalent, the `priority2` value will be the tie breaker where, again, lower values have higher priorities.
 
 #### Domain Settings
 
