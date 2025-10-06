@@ -1,7 +1,7 @@
 // pps-out-only.jsonc
 // Configure clock ${PTP_ID} virtual port for PPS-OUT using the fixed output pin.
 // Requires: ${PTP_ID}, ${PPS_OUT_PIN}
-// Optional: ${CLOCK_DOMAIN:-0}, ${PRIORITY1:-128}, ${PROFILE:-ieee1588}, ${DOMAIN_NUMBER:-0}, ${PCP:-0}, ${VLAN_ID:-1}
+// Optional: ${CLOCK_DOMAIN:-0}, ${PRIORITY1:-128}, ${PROFILE:-ieee1588}, ${PTP_DOMAIN:-0}, ${PCP:-0}, ${VLAN_ID:-1}
 //   You may also set ${PPS_OUT_DELAY:-0} in nanoseconds if you need an offset.
 //
 // Steps:
@@ -14,7 +14,7 @@
   "priority1": ${PRIORITY1},
   "priority2": 128,
   "oneWay": false,
-  "domainNumber": ${DOMAIN_NUMBER},
+  "domainNumber": ${PTP_DOMAIN},
   "protocol": "ethip4",
   "vid": ${VLAN_ID},
   "pcp": ${PCP},
@@ -29,6 +29,6 @@
   "enable": true,
   "virtualPortMode": "ppsOut",
   "outputPin": ${PPS_OUT_PIN},
-  "ppsDelay": ${PPS_OUT_DELAY:-0},
+  "ppsDelay": ${PPS_OUT_DELAY},
   "ptpTimescale": true
 }]}

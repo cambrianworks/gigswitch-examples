@@ -1,7 +1,7 @@
 // pps-in-only.jsonc
 // Configure clock ${PTP_ID} virtual port for PPS-IN using the fixed input pin.
 // Requires: ${PTP_ID}, ${PPS_IN_PIN}
-// Optional: ${CLOCK_DOMAIN:-0}, ${PRIORITY1:-128}, ${PROFILE:-ieee1588}, ${DOMAIN_NUMBER:-0}, ${PCP:-0}, ${VLAN_ID:-1}
+// Optional: ${CLOCK_DOMAIN:-0}, ${PRIORITY1:-128}, ${PROFILE:-ieee1588}, ${PTP_DOMAIN:-0}, ${PCP:-0}, ${VLAN_ID:-1}
 //
 // Steps:
 // 1) Ensure a clock exists with sane defaultDs (no network traffic needed)
@@ -13,7 +13,7 @@
   "priority1": ${PRIORITY1},
   "priority2": 128,
   "oneWay": false,
-  "domainNumber": ${DOMAIN_NUMBER},
+  "domainNumber": ${PTP_DOMAIN},
   "protocol": "ethip4",
   "vid": ${VLAN_ID},
   "pcp": ${PCP},
