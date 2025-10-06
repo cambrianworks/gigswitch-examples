@@ -54,10 +54,17 @@ The following settings will usually autopopulate, and you normally don’t need 
 ```
 
 #### Interval Values
+
+For `log` values (some don't have `log` in the parameter name but are described as `log` values in the documentation):
 - Generally, for a value V, the interval is 2^V seconds.
 - 0 (typical default) → 2^0 = 1 second (1 message per second)
 - Positive numbers (e.g. 3) → 2^3 = 8 seconds (1 every 8 seconds)
-- Negative numbers (e.g. -3) → 2^−3 = 1/8 second (i.e., 8 per second)
+- Negative numbers (e.g. -3) → 2^−3 = 1/8 second interval (i.e., 8 per second)
+
+Otherwise, time values have a similar interpretation except without log scale:
+- 0 typically references the default value
+- Positve numbers (e.g. 3) → 3 seconds (1 every 3 seconds)
+- Negative numbers (e.g. -3) → 1/3 = 1/3 second interval (i.e., 3 per second)
 
 #### Priority Settings
 
@@ -72,6 +79,7 @@ Some profiles/modes might force `priority1` to a fixed value and then, if all ot
 
 - Ensure you are on the same **PTP domain number** as your grandmaster (`ptp 0 domain 0` on line by itself).  
 - If you want the ability to copy time to the system clock: Ensure your **clock-domain** is also set to `0` (`clock-domain 0` as part of `ptp 0` long config line).
+- Documentation also states: It must be noted that DPLL and PHY operate in only clock domain 0.
 
 ### Verifying PTP Status
 
