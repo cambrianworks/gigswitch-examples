@@ -314,17 +314,32 @@ ptp 2 virtual-port mode pps-out 4
 
 ### Check pps out
 
-TODO
+You can check the status of pps out by running `show ptp ext`.
+
+If pps out isn't enabled, the output should should show `enabled: False` as below:
+
+```shell
+# show ptp ext
+PTP External One PPS mode: Output, Clock output enabled: False, frequency : 1,
+Preferred adj method     : Auto, PPS clock domain : 0
+```
+
+(TODO) If pps out is enabled, output might look like:
+```shell
+# show ptp ext
+PTP External One PPS mode: Output, Clock output enabled: True, frequency : 1,
+Preferred adj method     : Auto, PPS clock domain : 0
+```
 
 ### JSON-RPC / JSONC equivalent
 
-**PPS IN** (fixed pin from vars):
+**PPS IN** (uses a fixed value for pin from vars):
 
 ```bash
 gs-rpc post --continue --raw --vars ./ptp-template/vars-ptp.yaml -D PTP_ID=2 -f ./ptp-template/pps-in-only.jsonc
 ```
 
-**PPS OUT** (fixed pin and optional delay from vars):
+**PPS OUT** (uses a fixed value for pin and optional delay from vars):
 
 ```bash
 gs-rpc post --continue --raw --vars ./ptp-template/vars-ptp.yaml -D PTP_ID=2 -f ./ptp-template/pps-out-only.jsonc
