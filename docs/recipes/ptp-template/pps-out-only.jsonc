@@ -1,29 +1,9 @@
 // pps-out-only.jsonc
-// Configure clock ${PTP_ID} virtual port for PPS-OUT using the fixed output pin.
-// Requires: ${PTP_ID}, ${PPS_OUT_PIN}
-// Optional: ${CLOCK_DOMAIN:-0}, ${PRIORITY1:-128}, ${PROFILE:-ieee1588}, ${PTP_DOMAIN:-0}, ${PCP:-0}, ${VLAN_ID:-1}
-//   You may also set ${PPS_OUT_DELAY:-0} in nanoseconds if you need an offset.
+// Configure ptp ${PTP_ID} virtual port for PPS-OUT using the fixed output pin.
+// Requires: ${PTP_ID}, ${PPS_OUT_PIN}, ${PPS_OUT_DELAY}
 //
 // Steps:
-// 1) Ensure a clock exists with sane defaultDs
-// 2) Set virtualPort to ppsOut on outputPin ${PPS_OUT_PIN}
-
-{"method":"ptp.config.clocks.defaultDs.add","params":[ ${PTP_ID}, {
-  "deviceType": "ordBound",
-  "twoStepFlag": true,
-  "priority1": ${PRIORITY1},
-  "priority2": 128,
-  "oneWay": false,
-  "domainNumber": ${PTP_DOMAIN},
-  "protocol": "ethip4",
-  "vid": ${VLAN_ID},
-  "pcp": ${PCP},
-  "mep": -1,
-  "clkDom": ${CLOCK_DOMAIN},
-  "dscp": 0,
-  "profile": "${PROFILE}",
-  "localPriority": 128
-}]}
+// 1) Set virtualPort to ppsOut for outputPin ${PPS_OUT_PIN}
 
 {"method":"ptp.config.clocks.virtualPortConfig.set","params":[ ${PTP_ID}, {
   "enable": true,

@@ -25,6 +25,7 @@ DREQ_INT: 0
 
 # PPS pins (fixed)
 PPS_IN_PIN: 5
+PPS_IN_DELAY: 5
 PPS_OUT_PIN: 4
 PPS_OUT_DELAY: 0
 

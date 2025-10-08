@@ -305,11 +305,20 @@ Restart counters at 0 with:
 # debug ptp pps-tod statistics clear
 ```
 
-### Configure pps out
+### Disable pps in
 
 From `icli` `configure terminal`:
 ```shell
-ptp 2 virtual-port mode pps-out 4
+no ptp 2 virtual-port mode
+```
+
+### Configure pps out
+
+Here, we'll use "ptp 3" since we used "ptp 2" for pps-in.
+
+From `icli` `configure terminal`:
+```shell
+ptp 3 virtual-port mode pps-out 4
 ```
 
 ### Check pps out
@@ -324,27 +333,50 @@ PTP External One PPS mode: Output, Clock output enabled: False, frequency : 1,
 Preferred adj method     : Auto, PPS clock domain : 0
 ```
 
-(TODO) If pps out is enabled, output might look like:
+If pps out is enabled, the output should should show `enabled: True` as below:
+
 ```shell
 # show ptp ext
 PTP External One PPS mode: Output, Clock output enabled: True, frequency : 1,
-Preferred adj method     : Auto, PPS clock domain : 0
+Preferred adj method     : Auto, PPS clock domain : 0 
+```
+
+### Disable pps out
+
+From `icli` `configure terminal`:
+```shell
+no ptp 3 virtual-port mode
 ```
 
 ### JSON-RPC / JSONC equivalent
 
 **PPS IN** (uses a fixed value for pin from vars):
 
+Enable:
+
 ```bash
 gs-rpc post --continue --raw --vars ./ptp-template/vars-ptp.yaml -D PTP_ID=2 -f ./ptp-template/pps-in-only.jsonc
 ```
 
-**PPS OUT** (uses a fixed value for pin and optional delay from vars):
+Disable:
 
 ```bash
-gs-rpc post --continue --raw --vars ./ptp-template/vars-ptp.yaml -D PTP_ID=2 -f ./ptp-template/pps-out-only.jsonc
+gs-rpc post --continue --raw --vars ./ptp-template/vars-ptp.yaml -D PTP_ID=2 -f ./ptp-template/pps-virtual-port-disable.jsonc
 ```
 
+**PPS OUT** (uses a fixed value for pin and optional delay from vars):
+
+Enable:
+
+```bash
+gs-rpc post --continue --raw --vars ./ptp-template/vars-ptp.yaml -D PTP_ID=3 -f ./ptp-template/pps-out-only.jsonc
+```
+
+Disable:
+
+```bash
+gs-rpc post --continue --raw --vars ./ptp-template/vars-ptp.yaml -D PTP_ID=3 -f ./ptp-template/pps-virtual-port-disable.jsonc
+```
 
 ## Recipe: PTP as Standalone Master
 
