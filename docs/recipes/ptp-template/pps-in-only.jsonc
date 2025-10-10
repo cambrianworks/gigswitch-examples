@@ -1,0 +1,14 @@
+// pps-in-only.jsonc
+// Configure ptp ${PTP_ID} virtual port for PPS-IN using the fixed input pin.
+// Requires: ${PTP_ID}, ${PPS_IN_PIN}, ${PPS_IN_DELAY}
+//
+// Steps:
+// 1) Set virtualPort to ppsIn on inputPin ${PPS_IN_PIN}
+
+{"method":"ptp.config.clocks.virtualPortConfig.set","params":[ ${PTP_ID}, {
+  "enable": true,
+  "virtualPortMode": "ppsIn",
+  "inputPin": ${PPS_IN_PIN},
+  "ppsDelay": ${PPS_IN_DELAY},
+  "ptpTimescale": true
+}]}

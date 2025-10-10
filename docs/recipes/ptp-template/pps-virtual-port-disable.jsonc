@@ -1,0 +1,11 @@
+// pps-virtual-port-disable.jsonc
+// Undo eithor/or pps-in-only.jsonc and pps-out-only.jsonc
+// by setting "enable": false for clock ${PTP_ID}.
+//
+// Steps:
+// 1) Set virtualPortMode to noVirtualPortMode and enable to false
+
+{"method":"ptp.config.clocks.virtualPortConfig.set","params":[ ${PTP_ID}, {
+  "enable": false,
+  "virtualPortMode": "noVirtualPortMode"
+}]}

@@ -1,0 +1,14 @@
+// pps-out-only.jsonc
+// Configure ptp ${PTP_ID} virtual port for PPS-OUT using the fixed output pin.
+// Requires: ${PTP_ID}, ${PPS_OUT_PIN}, ${PPS_OUT_DELAY}
+//
+// Steps:
+// 1) Set virtualPort to ppsOut for outputPin ${PPS_OUT_PIN}
+
+{"method":"ptp.config.clocks.virtualPortConfig.set","params":[ ${PTP_ID}, {
+  "enable": true,
+  "virtualPortMode": "ppsOut",
+  "outputPin": ${PPS_OUT_PIN},
+  "ppsDelay": ${PPS_OUT_DELAY},
+  "ptpTimescale": true
+}]}
