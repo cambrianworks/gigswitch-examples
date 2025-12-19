@@ -1,0 +1,291 @@
+#!/usr/bin/expect -f
+# debug_trace_capture.exp - Automated debug trace capture for GigSwitch
+#
+# This assumes you've configured debug trace output and this serves
+# as an example of connecting to the switch over serial port,
+# executing some commands and capturing the primary output to file.
+#
+# This script connects to a GigSwitch via serial console, logs in to icli,
+# and captures the ringbuffer output to a timestamped file.
+#
+# Usage:
+#   ./debug_trace_capture.exp <device> [baudrate] [username] [password]
+#
+# Examples:
+#   ./debug_trace_capture.exp /dev/ttyUSB0
+#   ./debug_trace_capture.exp /dev/ttyUSB0 115200
+#   ./debug_trace_capture.exp /dev/ttyUSB0 115200 admin ""
+#
+# Output:
+#   Creates traces_YYYYMMDD_HHMMSS.log in current directory
+
+# Parse command line arguments
+if {[llength $argv] < 1} {
+    puts "Usage: $argv0 <device> \[baudrate\] \[username\] \[password\]"
+    puts ""
+    puts "Examples:"
+    puts "  $argv0 /dev/ttyUSB0"
+    puts "  $argv0 /dev/ttyUSB0 115200"
+    puts "  $argv0 /dev/ttyUSB0 115200 admin \"\""
+    puts ""
+    exit 1
+}
+
+set device [lindex $argv 0]
+set baudrate [expr {[llength $argv] > 1 ? [lindex $argv 1] : 115200}]
+set username [expr {[llength $argv] > 2 ? [lindex $argv 2] : "admin"}]
+set password [expr {[llength $argv] > 3 ? [lindex $argv 3] : ""}]
+
+set timeout 30
+log_user 1
+
+# Procedure to detect current console state
+proc detect_state {} {
+    set timeout 3
+    
+    # Don't send anything yet - just listen for what's there
+    expect {
+        -re "Username:\\s*$" { 
+            # Wait a bit more to ensure prompt is complete
+            after 100
+            return "need_username" 
+        }
+        -re "Password:\\s*$" { 
+            after 100
+            return "need_password" 
+        }
+        -re "\r\n#\\s*$" { 
+            return "icli_prompt" 
+        }
+        -re "~ #" { 
+            return "shell_root" 
+        }
+        -re "Press ENTER" { 
+            return "boot_menu" 
+        }
+        -re "\r\n" {
+            # Got some output but didn't match - send return to prompt
+            send "\r"
+            exp_continue
+        }
+        timeout { 
+            # Nothing happening - send return to wake it up
+            send "\r"
+            return "unknown" 
+        }
+    }
+}
+
+# Procedure to reach iCLI prompt from any state
+proc reach_icli {username password} {
+    set max_attempts 20
+    set attempt 0
+    
+    while {$attempt < $max_attempts} {
+        set state [detect_state]
+        puts "Detected state: $state (attempt $attempt)"
+        
+        switch $state {
+            "icli_prompt" {
+                puts "Reached iCLI prompt"
+                
+                # Clear any buffered input by sending a few returns
+                send "\r"
+                after 500
+                
+                return 0
+            }
+            "need_username" {
+                send "$username\r"
+                after 800  # Wait longer after username
+            }
+            "need_password" {
+                send "$password\r"
+                after 1200  # Wait even longer after password for auth
+            }
+            "boot_menu" {
+                send "\r"
+                after 500
+            }
+            "shell_root" {
+                send "exit\r"
+                after 500
+            }
+            "unknown" {
+                # Already sent return in detect_state
+                after 500
+            }
+        }
+        
+        incr attempt
+    }
+    
+    puts "ERROR: Could not reach iCLI prompt after $max_attempts attempts"
+    return 1
+}
+
+# Procedure to wait for prompt
+proc wait_for_prompt {} {
+    set timeout 10
+    
+    expect {
+        -re "\r\n#\\s*$" {
+            return 0
+        }
+        -re "\\^" {
+            # Got error marker, still wait for prompt
+            exp_continue
+        }
+        -re "% Invalid" {
+            # Got error message, still wait for prompt
+            exp_continue
+        }
+        timeout {
+            puts "WARNING: Timeout waiting for prompt"
+            return 1
+        }
+    }
+}
+
+puts "========================================"
+puts "GigSwitch Debug Trace Capture"
+puts "========================================"
+puts "Device:   $device"
+puts "Baudrate: $baudrate"
+puts "Username: $username"
+puts "========================================"
+
+# Connect to serial port
+puts "\nConnecting to $device at $baudrate baud..."
+spawn microcom -s $baudrate -p $device
+
+# Wait for connection to stabilize
+after 2000
+
+# Send initial wake-up sequence
+# Switch might need initial return to wake up the console
+send "\r"
+after 500
+
+# Reach iCLI prompt
+puts "\nAttempting to reach iCLI prompt..."
+if {[reach_icli $username $password] != 0} {
+    puts "\nERROR: Could not reach iCLI prompt"
+    puts "Please check:"
+    puts "  - Serial device is correct"
+    puts "  - Switch is powered on"
+    puts "  - Credentials are correct"
+    exit 1
+}
+
+puts "\n========================================"
+puts "Setting up debug trace capture..."
+puts "========================================"
+
+# Let things settle after login
+after 500
+
+# Disable pagination
+puts "\nDisabling pagination..."
+send "terminal length 0\r"
+wait_for_prompt
+
+# Enable platform debug
+puts "Enabling platform debug..."
+send "platform debug allow\r"
+wait_for_prompt
+
+# Optionally enable specific modules here. Ideally, this
+# is done separately and the trace configuration saved
+# since otherwise there isn't much expectation for a lot
+# of data.
+# Uncomment and customize as needed:
+#
+# puts "Enabling debug modules..."
+# send "debug trace module ringbuffer main board enable\r"
+# wait_for_prompt
+# send "debug trace module level main board info\r"
+# wait_for_prompt
+
+puts "\n========================================"
+puts "Capturing debug traces..."
+puts "========================================"
+puts "Reading until 3 seconds of idle time...\n"
+
+# Send the command
+send "debug trace ringbuffer print\r"
+
+# Turn off automatic terminal output
+log_user 0
+
+# Read traces until idle timeout
+set timeout 3
+set output ""
+set line_count 0
+
+expect {
+    -re "(.*?)\r\n" {
+        set line $expect_out(1,string)
+        
+        # Skip the echoed command and final prompt
+        if {![regexp {^debug trace} $line] && ![regexp {^#\s*$} $line]} {
+            append output $line
+            append output "\n"
+            incr line_count
+            
+            # Print progress every 50 lines
+            if {$line_count % 50 == 0} {
+                puts stderr "... captured $line_count lines ..."
+            }
+        }
+        
+        exp_continue
+    }
+    timeout {
+        # No data for 3 seconds - output complete
+    }
+}
+
+# Turn terminal output back on
+log_user 1
+
+# Generate filename with timestamp
+set timestamp [clock format [clock seconds] -format "%Y%m%d_%H%M%S"]
+set filename "traces_${timestamp}.log"
+
+# Save to file
+set fp [open $filename w]
+puts $fp $output
+close $fp
+
+puts "\n========================================"
+puts "Capture Complete"
+puts "========================================"
+puts "Lines captured: $line_count"
+puts "Output file:    $filename"
+puts "========================================"
+
+# Show file info
+if {[file exists $filename]} {
+    set filesize [file size $filename]
+    puts "File size:      $filesize bytes ([expr {$filesize / 1024}] KB)"
+    
+    # Show first few lines as preview
+    puts "\nFirst 5 lines of captured output:"
+    puts "--------------------"
+    set preview_fp [open $filename r]
+    set preview_count 0
+    while {[gets $preview_fp line] >= 0 && $preview_count < 5} {
+        puts $line
+        incr preview_count
+    }
+    close $preview_fp
+    puts "--------------------"
+}
+
+# Clean exit
+puts "\nExiting serial console..."
+send "exit\r"
+expect eof
+
+puts "\nDone!"

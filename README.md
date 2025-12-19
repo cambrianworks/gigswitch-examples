@@ -17,9 +17,29 @@ git clone https://github.com/cambrianworks/gigswitch-examples.git
 
 ## Documentation
 
-Documentation for configuration, recipes and quick tips are all in the `docs/` subdirectory:
+Documentation for configuration, recipes and quick tips are all in the `docs/` subdirectory.
 
-- [docs/README](./docs/README.md): Starting point for navigating the documentation.
+**Start here:** [docs/README.md](./docs/README.md) - Complete documentation index and navigation guide.
+
+## Helper Scripts
+
+The `bin/` directory contains useful scripts:
+
+- **`gs-rpc`**: JSON-RPC helper tool for switch configuration (see [docs/helper-tool-gs-rpc.md](./docs/helper-tool-gs-rpc.md))
+- **`gs-grab-running-config`**: Grab running config from switch
+- **`gs-grab-running-config-wrapper`**: Wrapper for config grabbing
+- **`setup_tftpd.sh`**: Automated TFTP server setup for file transfers
+- **`debug_trace_capture.exp`**: Automated debug trace capture via serial console
+
+Example usage:
+```bash
+# Set up TFTP server for file transfers
+./bin/setup_tftpd.sh 6069 ~/tftp-files
+
+# Capture debug traces via serial console
+# (assumes GigSwitch serial port connected to /dev/ttyUSB0)
+./bin/debug_trace_capture.exp /dev/ttyUSB0
+```
 
 ## License
 
