@@ -129,6 +129,14 @@ end
 
 You can review how the current startup config is stored by executing:
 
+From icli:
+
+```
+show startup-config
+```
+
+From shell:
+
 ```
 cat /switch/icfg/startup-config
 ```
@@ -155,4 +163,26 @@ ip http secure-server
 
 ...
 
+```
+
+### Review running-config
+
+The `running-config` will contain recent changes not yet saved to `startup-config` but will be equivalent if you haven't made changes since booting.
+
+The `running-config` is best reviewed from icli:
+
+```
+show running-config
+```
+
+**TIP:** Add the `all-defaults` argument to see a more complete config that includes applying the default values.
+
+```
+show running-config all-defaults
+```
+
+If you are having to step through multiple pages, you can turn off pagination from icli with:
+
+```
+terminal length 0
 ```
