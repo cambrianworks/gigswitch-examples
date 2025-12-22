@@ -26,19 +26,27 @@ Documentation for configuration, recipes and quick tips are all in the `docs/` s
 The `bin/` directory contains useful scripts:
 
 - **`gs-rpc`**: JSON-RPC helper tool for switch configuration (see [docs/helper-tool-gs-rpc.md](./docs/helper-tool-gs-rpc.md))
-- **`gs-grab-running-config`**: Grab running config from switch
-- **`gs-grab-running-config-wrapper`**: Wrapper for config grabbing
+- **`upload-switch-config.sh`**: Upload and apply configs via HTTP (see [docs/http-config-upload.md](./docs/http-config-upload.md))
+- **`download-switch-config.sh`**: Download configs from switch via HTTP
 - **`setup_tftpd.sh`**: Automated TFTP server setup for file transfers
 - **`debug_trace_capture.exp`**: Automated debug trace capture via serial console
+- **`gs-grab-running-config`**: Grab running config from switch using `expect` script
+- **`gs-grab-running-config-wrapper`**: Wrapper for gs-grab-running-config
 
 Example usage:
 ```bash
-# Set up TFTP server for file transfers
+# Upload and apply config to running-config (with merge=true)
+./bin/upload-switch-config.sh config.txt http://{GS_IP} running-config true
+
+# Set up TFTP server to support file transfers
 ./bin/setup_tftpd.sh 6069 ~/tftp-files
 
 # Capture debug traces via serial console
 # (assumes GigSwitch serial port connected to /dev/ttyUSB0)
 ./bin/debug_trace_capture.exp /dev/ttyUSB0
+
+# Download config from switch
+./bin/download-switch-config.sh http://{GS_IP} startup-config backup.txt
 ```
 
 ## License
