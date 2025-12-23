@@ -56,5 +56,8 @@ This document is designed for end users working with the GigSwitch.
 - **HTTP Config Upload**: Upload and apply configs via HTTP/curl - see [http-config-upload.md](http-config-upload.md)
 - **File Transfers**: HTTP, TFTP, wget, SCP, and serial transfer methods - see [file-transfers.md](file-transfers.md)
 
+### Debugging & Troubleshooting
+- **Scripting with Expect**: Automate iCLI tasks over SSH or serial - see [scripting-with-expect.md](scripting-with-expect.md)
+
 ### Emergency Recovery
 - **Serial Config Restore**: Restore config when network is down - see [serial-config-restore.md](serial-config-restore.md)
