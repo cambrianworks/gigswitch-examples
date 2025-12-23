@@ -1,6 +1,6 @@
 # Copy Config to or from GigSwitch
 
-Use these recipes to copy the running/startup config to an sftp server or copy a running/startup config from sftp server to device (you can't overwrite the default config and calls below don't allow obtaining default config).
+Use these recipes to copy the running/startup config to a tftp server or copy a running/startup config from a tftp server to device (you can't overwrite the default config and calls below don't allow obtaining default config).
 
 **Common use case:** It's common that you'll be updating the live or `running-config` and want to take periodic snapshots without necessarily committing to replacing the `startup-config`.
 
@@ -14,7 +14,7 @@ Use these recipes to copy the running/startup config to an sftp server or copy a
 
 ## Prerequisites
 
-You must have an sftp running at the default port and that your routing and firewall can connect to this machine at UDP port 69.
+You must have a tftp running at the default port and that your routing and firewall can connect to this machine at UDP port 69.
 
 ### Example tftp server setup
 
@@ -59,7 +59,7 @@ Ensure `tftp` and/or `curl` is installed:
 sudo apt install tftp curl
 ```
 
-Copy a file back and forth to sftp server:
+Copy a file back and forth to tftp server:
 
 With `tftp` (note that local ip should also work but `localhost` was problematic):
 

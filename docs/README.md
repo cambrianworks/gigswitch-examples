@@ -17,7 +17,7 @@ Welcome to the GigSwitch user documentation repository. This master guide will h
 
 This documentation covers:
 
-- Understanding switch basics including hardware, fileystem and capabilities
+- Understanding switch basics including hardware, filesystem and capabilities
 - Standard management methods (Web UI, CLI, vson, curl)
 - Helper tool (`gs-rpc`) usage
 - Configuration recipes using JSONL files

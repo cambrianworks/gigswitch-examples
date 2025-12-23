@@ -11,7 +11,7 @@ An at-a-glance comparison of available management methods and their use cases:
 - **Web UI**: Graphical interface best for one-off tasks and visual monitoring.
 - **SSH CLI**: Interactive CLI for manual configuration and troubleshooting.
 - **curl (JSON‑RPC)**: Raw API calls for scripting that requires all fields for authentication, headers, etc.
-- **Vendor **``** Utility**: Vencor JSON‑RPC wrapper with vendor-specific formatting and convenient subcommands.
+- **Vendor **``** Utility**: Vendor JSON‑RPC wrapper with vendor-specific formatting and convenient subcommands.
 - `gs-rpc` Utility: Cambrian's JSON‑RPC client with credential bootstrapping (see `helper-tool-gs-rpc.md`).
 
 ---
@@ -109,7 +109,7 @@ Method 1 - obtain generic spec simply with URL:
 
 ```bash
 curl -s -k -u admin:${GS_PASS} http://${GS_IP}/json_spec -o json_spec_generic.json
----
+```
 
 Method 2 - use `specific` version `generic` to filter out unsupported commands; use `jq` to grab only `result` portion of response:
 

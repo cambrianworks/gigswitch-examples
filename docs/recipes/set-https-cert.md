@@ -13,7 +13,7 @@ Constraints:
 
 ## Prerequisites
 
-See [save-config.md](save-config.md) if you need to set up an `sftp` server though you may also use a regular web server in this case.
+See [save-config.md](save-config.md) if you need to set up a `tftp` server though you may also use a regular web server in this case.
 
 If you go the web server route and simply want a quick web server to host files in your local directory, you can get it directly from Python with:
 

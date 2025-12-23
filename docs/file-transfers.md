@@ -18,7 +18,7 @@ Commands are marked with their execution context:
 
 The `copy` command supports TFTP and HTTP/HTTPS transfers.
 
-`copy <src> <dest> [
+`copy <src> <dest> [syntax-check]
 
 **[iCLI] Full command help:**
 ```
