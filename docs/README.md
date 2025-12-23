@@ -54,6 +54,7 @@ This document is designed for end users working with the GigSwitch.
 ### Configuration & Management
 - **Recipes**: Detailed configuration examples - in `recipes/` directory - see [recipes/README.md](recipes/README.md)
 - **HTTP Config Upload**: Upload and apply configs via HTTP/curl - see [http-config-upload.md](http-config-upload.md)
+- **File Transfers**: HTTP, TFTP, wget, SCP, and serial transfer methods - see [file-transfers.md](file-transfers.md)
 
 ### Emergency Recovery
 - **Serial Config Restore**: Restore config when network is down - see [serial-config-restore.md](serial-config-restore.md)
