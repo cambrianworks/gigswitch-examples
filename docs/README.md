@@ -45,8 +45,15 @@ This document is designed for end users working with the GigSwitch.
 
 ## Available Guides
 
+### Getting Started
 - **Quick Tips**: Quick tips such as basic login - see [quick-tips.md](quick-tips.md)
 - **Switch Basics**: General capabilities - see [switch-basics.md](switch-basics.md)
 - **Standard Tools**: Overview of management interfaces - see [standard-tools.md](standard-tools.md)
 - **Helper Tool**: Installation & commands - see [helper-tool-gs-rpc.md](helper-tool-gs-rpc.md)
+
+### Configuration & Management
 - **Recipes**: Detailed configuration examples - in `recipes/` directory - see [recipes/README.md](recipes/README.md)
+- **HTTP Config Upload**: Upload and apply configs via HTTP/curl - see [http-config-upload.md](http-config-upload.md)
+
+### Emergency Recovery
+- **Serial Config Restore**: Restore config when network is down - see [serial-config-restore.md](serial-config-restore.md)
