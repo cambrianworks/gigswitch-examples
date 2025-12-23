@@ -115,6 +115,7 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+CREDS="${USERNAME}:${PASSWORD}"
 
 # Parse positional arguments
 if [[ $# -lt 2 ]]; then
@@ -165,19 +166,40 @@ else
     info "Destination: /switch/icfg/${REMOTE_NAME}"
 fi
 
-# Execute upload
-if ! curl -u "${USERNAME}:${PASSWORD}" -X POST \
-    -F "file_name=${LOCAL_BASE_FILE}" \
-    -F "new_file_name=${REMOTE_NAME}" \
+# Execute upload - notes:
+# 1. Argument order is IMPORTANT
+# 2. Web UI always sets file_name same as new_file_name (not file_name=${LOCAL_BASE_FILE})
+#    (effectively, new_file_name is ignored)
+set +e
+UPLOAD_RESPONSE=$(curl -u "${USERNAME}:${PASSWORD}" -X POST \
+    -F "file_name=${REMOTE_NAME}" \
     -F "merge=${MERGE}" \
     -F "source_file=@${LOCAL_FILE};type=application/octet-stream" \
+    -F "file_name_radio=" \
+    -F "new_file_name=${REMOTE_NAME}" \
     -c "$COOKIES" -b "$COOKIES" \
-    -L "${UPLOAD_ENDPOINT}" \
-    --fail --silent --show-error > /dev/null; then
-    
-    error "Upload failed!"
-    echo "  Check switch URL: ${SWITCH_URL}"
-    echo "  Try: curl -u admin: ${SWITCH_URL}/"
+    "${UPLOAD_ENDPOINT}" \
+    --silent --show-error 2>&1)
+CURL_EXIT=$?
+set -e
+
+# Check for curl failure
+if [[ $CURL_EXIT -ne 0 ]]; then
+    error "Upload failed (curl error $CURL_EXIT)"
+    echo ""
+    echo "$UPLOAD_RESPONSE"
+    echo ""
+    echo "Check endpoint: ${UPLOAD_ENDPOINT}"
+    exit 1
+fi
+
+# Check if response is HTML (server returned error page instead of success)
+if [[ "$UPLOAD_RESPONSE" =~ ^[[:space:]]*\< ]]; then
+    error "Upload failed (server returned error)"
+    echo ""
+    echo "$UPLOAD_RESPONSE"
+    echo ""
+    echo "Check parameters and switch URL: ${SWITCH_URL}"
     exit 1
 fi
 
@@ -186,62 +208,105 @@ info "Upload successful!"
 # If filename is "running-config", activate it
 if [[ "$REMOTE_NAME" == "running-config" ]]; then
     info "Activating configuration..."
-    
-    RESPONSE=$(curl -u "${USERNAME}:${PASSWORD}" \
-        -b "$COOKIES" \
-        "${ACTIVATE_ENDPOINT}" \
-        --silent --show-error)
-    
-    STATUS=$(echo "$RESPONSE" | head -1)
-    OUTPUT=$(echo "$RESPONSE" | tail -n +2)
-    
-    case "$STATUS" in
-        DONE)
-            info "Configuration activated successfully!"
-            if [[ -n "$OUTPUT" && "$OUTPUT" != "(No output was generated.)" ]]; then
+
+    # Poll activation endpoint (it's async, may take several seconds)
+    MAX_ATTEMPTS=10
+    ATTEMPT=1
+    STATUS=""
+
+    while [[ $ATTEMPT -le $MAX_ATTEMPTS ]]; do
+	set +e
+        RESPONSE=$(curl -u "${USERNAME}:${PASSWORD}" \
+            -b "$COOKIES" \
+            "${ACTIVATE_ENDPOINT}" \
+            --max-time 10 \
+            --silent --show-error 2>&1)
+	CURL_EXIT=$?
+	set -e
+
+        # Check for curl errors (like timeout/empty reply)
+        if [[ $CURL_EXIT -ne 0 ]]; then
+            if [[ $ATTEMPT -eq $MAX_ATTEMPTS ]]; then
+                warn "Activation status check failed after $MAX_ATTEMPTS attempts"
+                echo "Last error: $RESPONSE"
+                echo ""
+                info "Config may still be applying."
+                break
+            fi
+            warn "Attempt $ATTEMPT/$MAX_ATTEMPTS: Waiting for activation to complete..."
+            ((ATTEMPT++))
+            continue
+        fi
+
+        STATUS=$(echo "$RESPONSE" | head -1)
+        OUTPUT=$(echo "$RESPONSE" | tail -n +2)
+
+        case "$STATUS" in
+            DONE)
+                info "Configuration activated successfully!"
+                if [[ -n "$OUTPUT" && "$OUTPUT" != "(No output was generated.)" ]]; then
+                    echo ""
+                    echo "Output:"
+                    echo "$OUTPUT"
+                fi
+                break
+                ;;
+            RUN)
+                if [[ $ATTEMPT -eq $MAX_ATTEMPTS ]]; then
+                    warn "Activation still in progress after $MAX_ATTEMPTS attempts"
+                    echo ""
+                    info "Check status later with:"
+                    echo "  curl -u ${CREDS} -b cookies.txt ${ACTIVATE_ENDPOINT}"
+                    break
+                fi
+                info "Attempt $ATTEMPT/$MAX_ATTEMPTS: Activation in progress..."
+                sleep 2
+                ((ATTEMPT++))
+                continue
+                ;;
+            ERR)
+                error "Activation completed with errors!"
                 echo ""
                 echo "Output:"
                 echo "$OUTPUT"
-            fi
-            ;;
-        RUN)
-            warn "Activation in progress..."
-            info "Call activation endpoint again to check status:"
-            echo "  curl -u admin: -b cookies.txt ${ACTIVATE_ENDPOINT}"
-            ;;
-        ERR)
-            error "Activation completed with errors!"
-            echo ""
-            echo "Output:"
-            echo "$OUTPUT"
-            exit 1
-            ;;
-        SYNERR)
-            error "Syntax check failed - configuration NOT activated!"
-            echo ""
-            echo "Output:"
-            echo "$OUTPUT"
-            exit 1
-            ;;
-        IDLE)
-            warn "No activation started"
-            info "This shouldn't happen - upload may have failed"
-            ;;
-        *)
-            warn "Unknown status: $STATUS"
-            echo "Response:"
-            echo "$RESPONSE"
-            ;;
-    esac
-    
+                exit 1
+                ;;
+            SYNERR)
+                error "Syntax check failed - configuration NOT activated!"
+                echo ""
+                echo "Output:"
+                echo "$OUTPUT"
+                exit 1
+                ;;
+            IDLE)
+                warn "No activation started"
+                info "This shouldn't happen - upload may have failed"
+                break
+                ;;
+            *)
+                if [[ $ATTEMPT -eq $MAX_ATTEMPTS ]]; then
+                    warn "Unknown status after $MAX_ATTEMPTS attempts: $STATUS"
+                    echo "Response:"
+                    echo "$RESPONSE"
+                    break
+                fi
+                warn "Attempt $ATTEMPT/$MAX_ATTEMPTS: Unknown status, retrying..."
+                sleep 2
+                ((ATTEMPT++))
+                continue
+                ;;
+        esac
+    done
+
     echo ""
     info "To verify changes:"
-    echo "  ssh admin@switch"
+    echo "  use script: download-switch-config.sh"
+    echo "or:"
+    echo "  ssh ${USERNAME}@switch"
     echo "  show running-config"
     echo ""
     info "To set as startup config (persist after reboot):"
     echo "  copy running-config startup-config"
-    
 else
     # Regular file upload
     echo ""
