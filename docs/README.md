@@ -57,6 +57,7 @@ This document is designed for end users working with the GigSwitch.
 - **File Transfers**: HTTP, TFTP, wget, SCP, and serial transfer methods - see [file-transfers.md](file-transfers.md)
 
 ### Debugging & Troubleshooting
+- **Debug Logging**: Enable and capture debug traces - see [debugging.md](debugging.md)
 - **Scripting with Expect**: Automate iCLI tasks over SSH or serial - see [scripting-with-expect.md](scripting-with-expect.md)
 
 ### Emergency Recovery
