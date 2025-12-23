@@ -124,8 +124,9 @@ if [[ $# -lt 2 ]]; then
 fi
 
 LOCAL_FILE="$1"
+LOCAL_BASE_FILE=$(basename "$LOCAL_FILE")
 SWITCH_URL="$2"
-REMOTE_NAME="${3:-$(basename "$LOCAL_FILE")}"
+REMOTE_NAME="${3:-$LOCAL_BASE_FILE}"
 MERGE="${4:-false}"
 
 # Validate local file
@@ -157,14 +158,17 @@ COOKIES=$(mktemp)
 trap "rm -f '$COOKIES'" EXIT
 
 info "Uploading '${LOCAL_FILE}' to ${SWITCH_URL}"
-info "Destination: /switch/icfg/${REMOTE_NAME}"
 if [[ "$REMOTE_NAME" == "running-config" ]]; then
     info "Mode: merge=${MERGE}"
+    info "Destination: live running-config"
+else
+    info "Destination: /switch/icfg/${REMOTE_NAME}"
 fi
 
 # Execute upload
 if ! curl -u "${USERNAME}:${PASSWORD}" -X POST \
-    -F "file_name=${REMOTE_NAME}" \
+    -F "file_name=${LOCAL_BASE_FILE}" \
+    -F "new_file_name=${REMOTE_NAME}" \
     -F "merge=${MERGE}" \
     -F "source_file=@${LOCAL_FILE};type=application/octet-stream" \
     -c "$COOKIES" -b "$COOKIES" \
