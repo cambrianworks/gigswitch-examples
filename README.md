@@ -29,6 +29,7 @@ The `bin/` directory contains useful scripts:
 - **`upload-switch-config.sh`**: Upload and apply configs via HTTP (see [docs/http-config-upload.md](./docs/http-config-upload.md))
 - **`download-switch-config.sh`**: Download configs from switch via HTTP
 - **`setup_tftpd.sh`**: Automated TFTP server setup for file transfers
+- **`serial-config-restore.exp`**: Restore config via serial console when network is down
 - **`debug_trace_capture.exp`**: Automated debug trace capture via serial console
 - **`gs-grab-running-config`**: Grab running config from switch using `expect` script
 - **`gs-grab-running-config-wrapper`**: Wrapper for gs-grab-running-config
@@ -40,6 +41,9 @@ Example usage:
 
 # Set up TFTP server to support file transfers
 ./bin/setup_tftpd.sh 6069 ~/tftp-files
+
+# Restore config via serial console (emergency recovery)
+./bin/serial-config-restore.exp /dev/ttyUSB0 backup-config.txt
 
 # Capture debug traces via serial console
 # (assumes GigSwitch serial port connected to /dev/ttyUSB0)

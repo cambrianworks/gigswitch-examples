@@ -30,7 +30,7 @@ This document is designed for end users working with the GigSwitch.
 
 - Access to the switch’s management interface (SSH or API)
 - Credentials for switch admin user
-- `gs-rpc` installed and bootstrapped (see `helper-tool.md`)
+- `gs-rpc` installed and bootstrapped (see `helper-tool-gs-rpc.md`)
 - Standard Debian/Ubuntu Linux machine recommended with `apt` installed packages
   - `sudo apt install curl jq python3 python3-requests python3-yaml`
 
@@ -61,4 +61,4 @@ This document is designed for end users working with the GigSwitch.
 - **Scripting with Expect**: Automate iCLI tasks over SSH or serial - see [scripting-with-expect.md](scripting-with-expect.md)
 
 ### Emergency Recovery
-- **Serial Config Restore**: Restore config when network is down - see [serial-config-restore.md](serial-config-restore.md)
+- **Serial Config Restore**: Restore config when network is down - see [serial-recovery.md](serial-recovery.md)

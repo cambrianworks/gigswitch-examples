@@ -326,7 +326,7 @@ When network is misconfigured and serial console is available:
 ./bin/serial-config-restore.exp /dev/ttyUSB0 backup-config.txt
 ```
 
-See [serial-config-restore.md](serial-config-restore.md) for details.
+See [serial-recovery.md](serial-recovery.md) for details.
 
 ### U-Boot Recovery
 
@@ -349,6 +349,6 @@ loadb     - load binary file over serial line (kermit mode)
 ## See Also
 
 - [http-config-upload.md](http-config-upload.md) - Complete HTTP workflow
-- [serial-config-restore.md](serial-config-restore.md) - Emergency recovery
+- [serial-recovery.md](serial-recovery.md) - Emergency recovery
 - [debugging.md](debugging.md) - Debug trace capture
 - Helper scripts in `../bin/`

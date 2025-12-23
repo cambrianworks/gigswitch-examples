@@ -214,7 +214,7 @@ cat /switch/icfg/crashfile
 
 Or download it:
 ```bash
-[Local] ./bin/download-switch-config.sh http://192.168.1.10 crashfile
+[Local] ./bin/download-switch-config.sh http://{GS_IP} crashfile
 ```
 
 Look for:

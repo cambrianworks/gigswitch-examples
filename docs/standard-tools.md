@@ -12,7 +12,7 @@ An at-a-glance comparison of available management methods and their use cases:
 - **SSH CLI**: Interactive CLI for manual configuration and troubleshooting.
 - **curl (JSON‑RPC)**: Raw API calls for scripting that requires all fields for authentication, headers, etc.
 - **Vendor **``** Utility**: Vencor JSON‑RPC wrapper with vendor-specific formatting and convenient subcommands.
-- `gs-rpc` Utility: Cambrian's JSON‑RPC client with credential bootstrapping (see `helper-tool.md`).
+- `gs-rpc` Utility: Cambrian's JSON‑RPC client with credential bootstrapping (see `helper-tool-gs-rpc.md`).
 
 ---
 
