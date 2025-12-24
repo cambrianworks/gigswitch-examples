@@ -17,7 +17,7 @@ Welcome to the GigSwitch user documentation repository. This master guide will h
 
 This documentation covers:
 
-- Understanding switch basics including hardware, fileystem and capabilities
+- Understanding switch basics including hardware, filesystem and capabilities
 - Standard management methods (Web UI, CLI, vson, curl)
 - Helper tool (`gs-rpc`) usage
 - Configuration recipes using JSONL files
@@ -30,7 +30,7 @@ This document is designed for end users working with the GigSwitch.
 
 - Access to the switch’s management interface (SSH or API)
 - Credentials for switch admin user
-- `gs-rpc` installed and bootstrapped (see `helper-tool.md`)
+- `gs-rpc` installed and bootstrapped (see `helper-tool-gs-rpc.md`)
 - Standard Debian/Ubuntu Linux machine recommended with `apt` installed packages
   - `sudo apt install curl jq python3 python3-requests python3-yaml`
 
@@ -45,8 +45,20 @@ This document is designed for end users working with the GigSwitch.
 
 ## Available Guides
 
+### Getting Started
 - **Quick Tips**: Quick tips such as basic login - see [quick-tips.md](quick-tips.md)
 - **Switch Basics**: General capabilities - see [switch-basics.md](switch-basics.md)
 - **Standard Tools**: Overview of management interfaces - see [standard-tools.md](standard-tools.md)
 - **Helper Tool**: Installation & commands - see [helper-tool-gs-rpc.md](helper-tool-gs-rpc.md)
+
+### Configuration & Management
 - **Recipes**: Detailed configuration examples - in `recipes/` directory - see [recipes/README.md](recipes/README.md)
+- **HTTP Config Upload**: Upload and apply configs via HTTP/curl - see [http-config-upload.md](http-config-upload.md)
+- **File Transfers**: HTTP, TFTP, wget, SCP, and serial transfer methods - see [file-transfers.md](file-transfers.md)
+
+### Debugging & Troubleshooting
+- **Debug Logging**: Enable and capture debug traces - see [debugging.md](debugging.md)
+- **Scripting with Expect**: Automate iCLI tasks over SSH or serial - see [scripting-with-expect.md](scripting-with-expect.md)
+
+### Emergency Recovery
+- **Serial Config Restore**: Restore config when network is down - see [serial-recovery.md](serial-recovery.md)

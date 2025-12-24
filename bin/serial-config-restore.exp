@@ -1,0 +1,251 @@
+#!/usr/bin/expect -f
+# serial-config-restore.exp - Restore configuration via serial console
+#
+# Usage:
+#   ./serial-config-restore.exp <serial-device> <config-file> [username] [password]
+#
+# Examples:
+#   ./serial-config-restore.exp /dev/ttyUSB0 backup-config.txt
+#   ./serial-config-restore.exp /dev/ttyUSB0 backup-config.txt admin
+#   ./serial-config-restore.exp /dev/ttyUSB0 backup-config.txt admin mypassword
+#
+# Defaults: username=admin, password="" (empty)
+#
+# This script:
+# 1. Connects to serial console
+# 2. Logs in to iCLI
+# 3. Copies config file content to /switch/icfg/startup-config
+# 4. Prompts to reload
+
+set timeout 30
+
+if {[llength $argv] < 2} {
+    puts "Usage: $argv0 <serial-device> <config-file> \[username\] \[password\]"
+    puts ""
+    puts "Examples:"
+    puts "  $argv0 /dev/ttyUSB0 backup-config.txt"
+    puts "  $argv0 /dev/ttyUSB0 backup-config.txt admin"
+    puts "  $argv0 /dev/ttyUSB0 backup-config.txt admin mypassword"
+    puts ""
+    puts "Defaults: username=admin, password=\"\" (empty)"
+    puts ""
+    puts "This will restore the config file to /switch/icfg/startup-config"
+    puts "You will be prompted to reload the switch after transfer."
+    exit 1
+}
+
+set device [lindex $argv 0]
+set config_file [lindex $argv 1]
+
+# Optional username/password with defaults
+if {[llength $argv] >= 3} {
+    set username [lindex $argv 2]
+} else {
+    set username "admin"
+}
+
+if {[llength $argv] >= 4} {
+    set password [lindex $argv 3]
+} else {
+    set password ""
+}
+
+# Check if config file exists
+if {![file exists $config_file]} {
+    puts "ERROR: Config file not found: $config_file"
+    exit 1
+}
+
+# Check if device exists
+if {![file exists $device]} {
+    puts "ERROR: Serial device not found: $device"
+    puts ""
+    puts "Available serial devices:"
+    catch {exec ls -l /dev/ttyUSB* /dev/ttyACM*} result
+    puts $result
+    exit 1
+}
+
+puts "========================================"
+puts "Serial Config Restore"
+puts "========================================"
+puts "Device: $device"
+puts "Config: $config_file"
+puts "Username: $username"
+if {$password == ""} {
+    puts "Password: (empty)"
+} else {
+    puts "Password: ****"
+}
+puts ""
+
+# Read config file
+set fp [open $config_file r]
+set config_content [read $fp]
+close $fp
+
+set config_lines [split $config_content "\n"]
+set line_count [llength $config_lines]
+
+puts "Config file: $line_count lines"
+puts ""
+puts "Connecting to serial console..."
+
+# Connect to serial
+spawn microcom -s 115200 -p $device
+
+# Wait for serial port to stabilize
+sleep 2
+
+# Send newline to get prompt
+send "\r"
+after 500
+
+# Detect current state and login if needed
+set logged_in 0
+set attempts 0
+set max_attempts 10
+
+while {$logged_in == 0 && $attempts < $max_attempts} {
+    incr attempts
+    send "\r"
+
+    set timeout 5
+    expect {
+        "Username:" {
+            puts "Sending username..."
+            send "$username\r"
+        }
+        "Password:" {
+            puts "Sending password..."
+            send "$password\r"
+        }
+        "# " {
+            puts "At iCLI prompt"
+            set logged_in 1
+        }
+        timeout {
+            if {$attempts >= $max_attempts} {
+                puts "ERROR: Could not reach iCLI prompt after $attempts attempts"
+                exit 1
+            }
+            puts "Waiting... ($attempts/$max_attempts)"
+        }
+    }
+}
+
+puts "Logged in successfully"
+puts ""
+
+# Wait for stable prompt
+set timeout 3
+send "\r"
+expect "# "
+after 500
+
+# Enter shell
+puts "Enabling debug..."
+send "platform debug allow\r"
+expect "# "
+after 500
+
+puts "Entering shell..."
+send "debug system shell\r"
+set timeout 10
+expect {
+    "~ # " { }
+    timeout {
+        puts "ERROR: Could not enter shell"
+        exit 1
+    }
+}
+
+puts "In shell"
+puts ""
+puts "Transferring config file..."
+puts "Writing to /switch/icfg/startup-config..."
+
+# Start cat command to write file
+send "cat > /switch/icfg/startup-config << 'EOF_CONFIG_MARKER'\r"
+sleep 0.5
+
+# Send config content line by line with delay
+set line_num 0
+foreach line $config_lines {
+    incr line_num
+    send "$line\r"
+    after 10  # Small millis delay to avoid overwhelming serial buffer
+
+    # Progress indicator every 50 lines
+    if {$line_num % 50 == 0} {
+        puts "  Sent $line_num / $line_count lines..."
+    }
+}
+
+# End heredoc
+send "EOF_CONFIG_MARKER\r"
+expect "~ # "
+sleep 0.5
+
+puts ""
+puts "Config transferred successfully!"
+puts ""
+
+# Verify file exists
+send "ls -lh /switch/icfg/startup-config\r"
+expect "~ # "
+
+# Exit shell
+send "exit\r"
+expect "# "
+sleep 0.5
+
+puts ""
+puts "========================================"
+puts "Transfer Complete!"
+puts "========================================"
+puts ""
+puts "Config file has been written to:"
+puts "  /switch/icfg/startup-config"
+puts ""
+puts "To apply the new config:"
+puts "  1. Review with: show startup-config"
+puts "  2. Apply with: reload cold"
+puts ""
+puts -nonewline "Reload switch now? (y/n): "
+flush stdout
+
+set user_input [gets stdin]
+
+if {[string tolower $user_input] == "y"} {
+    puts ""
+    puts "Reloading switch..."
+    send "reload cold\r"
+
+    expect {
+        "confirm" {
+            send "y\r"
+        }
+        timeout {
+            puts "No confirmation prompt, proceeding..."
+        }
+    }
+
+    puts ""
+    puts "Switch is rebooting..."
+    puts "Wait for boot messages to complete."
+    puts "Press Ctrl-\\ to exit microcom"
+
+    # Let user see boot messages
+    interact
+} else {
+    puts ""
+    puts "Reload skipped. You can reload later with:"
+    puts "  reload cold"
+    puts ""
+    puts "Exiting to interactive mode..."
+    puts "Press Ctrl-\\ to exit microcom"
+
+    # Hand control to user
+    interact
+}

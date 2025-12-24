@@ -63,7 +63,7 @@ For `log` values (some don't have `log` in the parameter name but are described 
 
 Otherwise, time values have a similar interpretation except without log scale:
 - 0 typically references the default value
-- Positve numbers (e.g. 3) → 3 seconds (1 every 3 seconds)
+- Positive numbers (e.g. 3) → 3 seconds (1 every 3 seconds)
 - Negative numbers (e.g. -3) → 1/3 = 1/3 second interval (i.e., 3 per second)
 
 #### Priority Settings
@@ -325,7 +325,7 @@ ptp 3 virtual-port mode pps-out 4
 
 You can check the status of pps out by running `show ptp ext`.
 
-If pps out isn't enabled, the output should should show `enabled: False` as below:
+If pps out isn't enabled, the output should show `enabled: False` as below:
 
 ```shell
 # show ptp ext

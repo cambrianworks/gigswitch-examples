@@ -43,11 +43,11 @@ Both `vson` and `gs-rpc` include the following sub-commands:
 
 **spec:** For a specified method, look up information on arguments and return value
 
-**update-spec:** Updated the cached json-rpc spec file
+**update-spec:** Update the cached json-rpc spec file
 
 `gs-rpc` adds the following:
 
-**post:** Post given json body as json-rpc input (`{"method": "method-name", "params": [PARAMS], "id": SOME_ID}`). Will create arbitrary `id` if omitted and will set `params` to `[]` if omitted. Can specify a file file with jsonl calls to apply with `-f`, pass on command line with `-d` or omit and read jsonl from `stdin`. Auto-detects and allows multi-line json input also (whereas each jsonl structure would be on a single line).
+**post:** Post given json body as json-rpc input (`{"method": "method-name", "params": [PARAMS], "id": SOME_ID}`). Will create arbitrary `id` if omitted and will set `params` to `[]` if omitted. Can specify a file with jsonl calls to apply with `-f`, pass on command line with `-d` or omit and read jsonl from `stdin`. Auto-detects and allows multi-line json input also (whereas each jsonl structure would be on a single line).
 
 **type:** Look up type information for the specified type.
 
